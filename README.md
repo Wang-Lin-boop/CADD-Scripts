@@ -42,7 +42,7 @@ A linux shell script to run Virual Screening WorkFlow for Schrodinger.
 
 mdgo
 =====
-            A linux shell script to run MD job from a mae file by Desmond.
+A linux shell script to run MD job from a mae file by Desmond.
 
             Usage: mdgo [OPTION] <parameter>
 
