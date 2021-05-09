@@ -9,7 +9,7 @@ Drugbank=/public/home/baifang/compounds_library/Drugbank
 TCMD=/public/home/baifang/compounds_library/Natural_product
 CNCL=/public/home/baifang/compounds_library/CNCL
 Database=CBCF
-Databaselist=("CBCF" "SIAIS" "HMDB" "Chemdiv" "ZincLead" "HMDBmembrane" "Drugbank" "TCMD")
+Databaselist=("HMDB" "Chemdiv" "ZincLead" "HMDBmembrane" "Drugbank" "TCMD")
 
 #Host and Schrodinger Path
 Host=HPC_CPU
