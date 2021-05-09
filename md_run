@@ -1,0 +1,439 @@
+#!/bin/bash
+
+#Default
+    # MD params
+    export mintime=100
+    export mdtime=100000.0
+    export Host=HPC_GPU
+    export num=1
+    export temperature=310
+    export frames=1000
+    export Analysis=false
+    export ProteinASL="chain.name A"
+    export LigandASL="res.ptype UNK"
+    export constraint=false
+    export constraintASL="chain.name A AND backbone"
+    export constraintForce=10
+
+    # File and Host
+    export input=*.mae
+    export CPU_HOST=HPC_CPU
+    export GPU_HOST=HPC_GPU
+    export send_email=false
+
+    # Desmond
+    export Desmond=${Desmond}
+
+help (){
+cat<<HELP
+
+Usage: mdgo [OPTION] <parameter>
+
+An automatic Desmond MD pipline.
+
+Example: md_run -i "*.cms" -t 200 -P "chain.name A" -L "chain.name C" -G HPC_gpu01 -n 1 
+
+Input parameter:
+  -i	Use a file name (Multiple files are wrapped in "", and split by ' ') or regular expression to represent your input cms file, default is "*.cms".
+
+Minimazation parameter:
+  -m	Enter the maximum simulation time for the Brownian motion simulation, in ps. <100>
+
+MD control parameter:
+  -t    Enter the Molecular dynamics simulation time for the Brownian motion simulation, in ns. <100>
+  -T    Specify the temperature to be used, in kelvin. <310>
+  -n    Number of Repeat simulation with different random numbers. <1>
+  -P    Define a ASL to protein, such as "chain.name A"
+  -L    Define a ASL to ligand, such as "res.ptype UNK"
+  -C    Set constraint to an ASL, such as "chain.name A AND backbone"
+  -f    Set constraint force, default is 10.
+  -o    Specify the approximate number of frames in the trajectory.  <1000>
+        This value is coupled with the recording interval for the trajectory and the simulation time: the number of frames times the trajectory recording interval is the total simulation time.
+        If you adjust the number of frames, the recording interval is modified.
+
+Job control:
+  -H	Hostname of your queue, default is HPC_CPU.
+  -G    GPU Host you wanna to use, default is  HPC_GPU.
+  -E    Send a notification email when MD job terminates.
+  -D	Your Desmond path. <$Desmond>
+
+Thank you for your using, If you have any question, Please contact wanglin3@shanghaitech.edu.cn.
+HELP
+}
+
+while getopts ":hi:H:G:D:f:C:t:n:P:L:T:o:F:E:" opt
+do
+  case $opt in
+    h)
+        help
+        exit;;
+    i)
+        input=$OPTARG;;
+    H)
+        CPU_HOST=$OPTARG;;
+    G)
+        GPU_HOST=$OPTARG;;
+    D)
+        Desmond=$OPTARG;;
+    f)
+        constraint=true
+        constraintForce=$OPTARG
+        ;;
+    C)
+        constraint=true
+        constraintASL=$OPTARG
+        ;;
+    t)
+        mdtime=`echo "${OPTARG} * 1000.0"|bc`;;
+    n)
+        num=$OPTARG;;
+    P)
+        Analysis=true
+        ProteinASL=$OPTARG
+        ;;
+    L)
+        Analysis=true
+        LigandASL=$OPTARG
+        ;;
+    T)
+        temperature=$OPTARG;;
+    o)
+        frames=$OPTARG;;
+    F)
+        ffid=$OPTARG;;
+    E)
+        send_email=true
+        Email=$OPTARG;;
+    ?)
+      echo ""
+      echo "Error: Do not use undefined options: $OPTARG,Try -h."
+      echo ""
+      exit;;
+  esac
+done
+
+# Check Desmond and hostfile
+if [ -d ${Desmond} ];then
+  if [ "${Desmond}" == "" ];then
+    echo "Desmond not found. Please check your Desmond Path."
+    exit
+  fi
+  if [ "`grep -c $CPU_HOST ${Desmond}/schrodinger.hosts`" == "0" ];then
+    echo $CPU_HOST "Hostfile not found."
+    exit
+  fi
+  if [ "`grep -c $GPU_HOST ${Desmond}/schrodinger.hosts`" == "0" ];then
+    echo $GPU_HOST "Hostfile not found."
+    exit
+  fi
+else
+  echo "Desmond not found. Please check your Desmond Path."
+  exit
+fi
+
+# MD control
+interval=`echo "scale=1;${mdtime} / ${frames}"|bc`
+seedlist=()
+if [ ${num} -gt 4 ];then
+    read -p "Do you really want to run more than three random simulations? Make sure you have adequate resources. Press Enter to continue and enter NO to exit!" makesure
+    if [ "$makesure" == "NO" ];then
+        echo "Recommnded repeat number is 3!"
+        exit
+    else
+        echo "Your system will perform ${num} simulations at different random speeds."
+        for i in $(seq 1 ${num});do
+        seedlist+=("$RANDOM");done
+    fi
+elif [ "${num}" == "1" ];then
+        seedlist=(2007)
+        echo "Your system will only perform one simulation."
+else
+    echo "Your system will perform ${num} simulations at different random speeds."
+    for i in $(seq 1 ${num});do
+    seedlist+=("$RANDOM");done
+fi
+
+# report MD information
+cat<<OUT
+
+Jobs will run at $CPU_HOST and ${GPU_HOST} ;
+
+Your MD information is as follows:
+
+minimize time: ${mintime} ps
+
+Time: ${mdtime} ps
+Temperature: ${temperature} K
+Rondom numbers list: ${seedlist[@]}
+Interval time: ${interval} ps
+Protein_Ligand Analysis: ${Analysis}
+MD constraint: ${constraint}
+OUT
+if [ "$Analysis"x == "true"x ];then
+cat<<ANAN
+Protein ASL: ${ProteinASL}
+Ligand ASL: ${LigandASL}
+ANAN
+fi
+if [ "$constraint"x == "true"x ];then
+cat<<CNCN
+Constraint ASL: ${constraintASL}
+CNCN
+fi
+
+# Check input file
+if ls $input >/dev/null 2>&1;then
+  echo ""
+  echo "These cms files will be processed:"
+  for i in `ls $input`; do echo $i;done
+else
+  echo ""
+  echo "Error: cms file not found, please check it."
+  exit
+fi
+echo ""
+
+# Parse constraint
+if [ "$constraint"x == "true"x ];then
+    constraintDescription="restrain = {atom = "asl:$constraintASL" force_constant = $constraintForce}"
+else
+    constraintDescription="restrain = none"
+fi
+
+GenParamFiles(){
+# Generate MSJ file
+cat <<EOF > $1/mdgo.msj
+# This msj is genenated by md_run script.
+# If you have any question, Please contact wanglin3@shanghaitech.edu.cn.
+# All times are in the unit of ps.
+# Energy is in the unit of kcal/mol.
+
+task {
+  task = "desmond:auto"
+  set_family = {
+    simulate = {
+    checkpt.write_last_step = no
+    }
+  }
+}
+
+simulate {
+    title       = "Brownian Dynamics NVT, T = 10 K, small timesteps, and restraints on solute heavy atoms, 100ps"
+    annealing   = off
+    time        = 100
+    timestep    = [0.001 0.001 0.003 ]
+    temperature = 10.0
+    ensemble = {
+        class = "NVT"
+        method = "Brownie"
+        brownie = {
+            delta_max = 0.1
+        }
+    }
+    restrain = {
+        atom = "solute_heavy_atom"
+        force_constant = 50.0
+    }
+}
+
+simulate {
+    title       = "Brownian Dynamics NVT, T = 10 K, small timesteps, and restraints on user defined sets, ${mintime}ps"
+    annealing   = off
+    time        = ${mintime}
+    timestep    = [0.001 0.001 0.003 ]
+    temperature = 10.0
+    ensemble = {
+        class = "NVT"
+        method = "Brownie"
+        brownie = {
+            delta_max = 0.1
+        }
+        thermostat = {
+            tau = 1.0
+        }
+    }
+    ${constraintDescription}
+}
+
+simulate {
+    title       = "Langevin NVT, T = 10 K, small timesteps, and restraints on solute heavy atoms, 12ps"
+    annealing   = off
+    time        = 12
+    timestep    = [0.001 0.001 0.003]
+    temperature = 10.0
+    restrain    = { atom = solute_heavy_atom force_constant = 50.0 }
+    ensemble    = {
+        class  = NVT
+        method = Langevin
+        thermostat.tau = 0.1
+    }
+    randomize_velocity.interval = 1.0
+    eneseq.interval             = 0.3
+    trajectory.center           = []
+}
+
+simulate {
+    title       = "Langevin NPT, T = 10 K, and restraints on solute heavy atoms, 12ps"
+    annealing   = off
+    time        = 12
+    temperature = 10.0
+    restrain    = retain
+    ensemble    = {
+        class  = NPT
+        method = Langevin
+        thermostat.tau = 0.1
+        barostat  .tau = 50.0
+    }
+    randomize_velocity.interval = 1.0
+    eneseq.interval             = 0.3
+    trajectory.center           = []
+}
+
+simulate {
+    title       = "Langevin NPT and restraints on solute heavy atoms, 12ps"
+    effect_if   = [["@*.*.annealing"] 'annealing = off temperature = "@*.*.temperature[0][0]"']
+    time        = 12
+    restrain    = retain
+    ensemble    = {
+        class  = NPT
+        method = Langevin
+        thermostat.tau = 0.1
+        barostat  .tau = 50.0
+    }
+    randomize_velocity.interval = 1.0
+    eneseq.interval             = 0.3
+    trajectory.center           = []
+}
+
+simulate {
+    title       = "Langevin NPT and no restraints, 24ps"
+    effect_if   = [["@*.*.annealing"] 'annealing = off temperature = "@*.*.temperature[0][0]"']
+    time        = 24
+    ensemble    = {
+        class  = NPT
+        method = Langevin
+        thermostat.tau = 0.1
+        barostat  .tau = 2.0
+    }
+    eneseq.interval   = 0.3
+    trajectory.center = solute
+}
+
+simulate {
+    title    = "Final MD, ${mdtime} ps"
+    cfg_file = "mdgo.cfg"
+    jobname  = "\$MASTERJOBNAME"
+    dir      = "."
+    compress = ""
+}
+
+EOF
+
+if [ "$Analysis"x == "true"x ];then
+cat<<MSJAA >> $1/mdgo.msj
+
+pl_analysis {
+    ligand_asl = "$LigandASL"
+    protein_asl = "$ProteinASL"
+}
+MSJAA
+fi
+
+cat<<MDCFG > $1/mdgo.cfg
+
+annealing = false
+backend = {
+}
+bigger_rclone = false
+checkpt = {
+    first = 0.0
+    interval = 240.06
+    name = "\$JOBNAME.cpt"
+    write_last_step = true
+}
+cpu = 1
+cutoff_radius = 9.0
+elapsed_time = 0.0
+energy_group = false
+eneseq = {
+    first = 0.0
+    interval = 1.2
+    name = "\$JOBNAME\$[_replica\$REPLICA\$].ene"
+}
+ensemble = {
+barostat = {
+    tau = 2.0
+}
+class = NPT
+method = MTK
+thermostat = {
+    tau = 1.0
+}
+}
+glue = solute
+maeff_output = {
+    first = 0.0
+    interval = 120.0
+    name = "\$JOBNAME\$[_replica\$REPLICA\$]-out.cms"
+    periodicfix = true
+    trjdir = "\$JOBNAME\$[_replica\$REPLICA\$]_trj"
+}
+meta = false
+meta_file = ?
+pressure = [1.01325 isotropic ]
+randomize_velocity = {
+    first = 0.0
+    interval = inf
+    seed = $2
+    temperature = "@*.temperature"
+}
+$constraintDescription
+simbox = {
+    first = 0.0
+    interval = 1.2
+    name = "\$JOBNAME\$[_replica\$REPLICA\$]_simbox.dat"
+}
+surface_tension = 0.0
+taper = false
+temperature = [
+    [${temperature}.0 0 ]
+]
+time = ${mdtime}
+timestep = [0.002 0.002 0.006 ]
+trajectory = {
+    center = []
+    first = 0.0
+    format = dtr
+    frames_per_file = 250
+    interval = ${interval}
+    name = "\$JOBNAME\$[_replica\$REPLICA\$]_trj"
+    periodicfix = true
+    write_velocity = false
+}
+
+MDCFG
+}
+
+for i in `ls $input`; do
+for seed in ${seedlist[@]};do
+    mkdir ${i%%.cms*}-${seed}-md
+    GenParamFiles ${i%%.cms*}-${seed}-md ${seed}
+    cd ${i%%.cms*}-${seed}-md
+    if [ $send_email == true ];then
+    $Desmond/utilities/multisim -JOBNAME ${i%%.cms*}-md -HOST $CPU_HOST -SUBHOST $GPU_HOST -notify ${Email} -maxjob 1 -cpu 1 -c mdgo.cfg -lic DESMOND_ACADEMIC:16 -o ${i%%.cms*}-md-out.cms -m mdgo.msj ../$i
+    else
+    $Desmond/utilities/multisim -JOBNAME ${i%%.cms*}-md -HOST $CPU_HOST -SUBHOST $GPU_HOST -maxjob 1 -cpu 1 -c mdgo.cfg -lic DESMOND_ACADEMIC:16 -o ${i%%.cms*}-md-out.cms -m mdgo.msj ../$i
+    fi
+    cd ..
+    date
+    echo "MD system ${i%%.mae*} with ${seed} seed had been submitted to $CPU_HOST and $GPU_HOST."
+done
+done
+
+cat<<FF
+
+All jobs are running!
+Thank you for your using, If you found any question, Please contact wanglin3@shanghaitech.edu.cn.
+
+FF
+

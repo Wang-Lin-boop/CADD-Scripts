@@ -1,0 +1,267 @@
+#!/bin/bash
+
+#Default
+    # MD system build
+    export negaion='Cl'
+    export solvent="TIP3P"
+    export rezerosys=true
+    export minisys=true
+    export boxshape=cubic
+    export boxsize=15.0
+    export position=Na
+    export ffid=OPLS_2005
+    export NeorPo=false
+    export saltconcentration=0.15
+    export addsaltmore=false
+
+    # File and Host
+    export input=*.mae
+    export CPU_HOST=HPC_CPU
+
+    # Desmond
+    export Desmond=${Desmond}
+
+help (){
+cat<<HELP
+
+Usage: md_build [OPTION] <parameter>
+
+Prepare your maestro structure files to Desmond MD system file and generate a summary for your MD system.
+
+Example: md_build -N -b cubic -p K -F amber99SB-ILDN -i *.mae 
+
+Input parameter:
+  -i	Use a file name (Multiple files are wrapped in "", and split by ' ') or regular expression to represent your input file, default is "*.mae".
+
+MD System parameter:
+  -N	Do you want to use negative_ion to neutralize_system? 
+		Defulat is no. if you use this option, your systems will be neutralize by nagative_ion.
+  -b	Define a boxshape for your systems. <cubic>
+  -s	Define a boxsize for your systems.  <15.0>
+		for dodecahedron_hexagon and cubic, defulat is 15.0;
+		for orthorhombic or triclinic box, defulat is [15.0 15.0 15.0];
+		If you want use Orthorhombic or Triclinic box, your parameter should be like "15.0 15.0 15.0"
+  -p	What positive_ion do you want use to neutralize_system? <Na>
+		Na, Li, K, Rb, Cs are predefined.
+  -n	What nagative_ion do you want use to neutralize_system? <Cl>
+		F, Cl, Br, I are predefined.
+  -w	Solvent model of your systems. <TIP3P>
+		SPC, TIP3P, TIP4P, TIP5P, DMSO, METHANOL are predefined.
+  -c	Set a concentration to add salt, the unit is M. <0.15>
+  -F	Define a force field to build your systems, If your system contain ligand or non-standard residues, OPLS_2005 is Necessary.
+		OPLS_2005, S-OPLS, amber99SB-ILDN, amber03, amber99, amber99SB, charmm32, charmm36_lipids are recommended.
+  -x  Interactive addition of extra salt.
+
+Job control:
+  -H	Hostname of your queue, defult is HPC_CPU.
+  -D	Your Desmond path. <$Desmond>
+
+Thank you for your using, If you found any problem, Please contact wanglin3@shanghaitech.edu.cn.
+HELP
+}
+
+while getopts ":hNi:b:s:p:n:w:r:H:D:c:F:x" opt
+do
+  case $opt in
+    h)
+      help
+      exit;;
+    N)
+      NeorPo=true;;
+    i)
+      input=$OPTARG;;
+    s)
+      boxsize=$OPTARG
+      boxxyz=${boxsize}
+      ;;
+    b)
+      boxshape=$OPTARG;;
+    p)
+      position=$OPTARG;;
+    n)
+      negaion=$OPTARG;;
+    w)
+      solvent=$OPTARG;;
+    H)
+      CPU_HOST=$OPTARG;;
+    D)
+      Desmond=$OPTARG;;
+    c)
+      saltconcentration=$OPTARG;;
+    F)
+      ffid=$OPTARG;;
+    x)
+      addsaltmore=true;;
+    ?)
+      echo ""
+      echo "Error: Do not use undefined options."
+      echo ""
+      help
+      exit;;
+  esac
+done
+
+# Check Desmond and hostfile
+if [ -d ${Desmond} ];then
+  if [ "${Desmond}" == "" ];then
+    echo "Desmond not found. Please check your Desmond Path."
+    exit
+  fi
+  if [ "`grep -c $CPU_HOST ${Desmond}/schrodinger.hosts`" == "0" ];then
+    echo $CPU_HOST "Hostfile not found."
+    exit
+  fi
+else
+  echo "Desmond not found. Please check your Desmond Path."
+  exit
+fi
+
+# negative_ion or positive_ion
+if [ "$NeorPo"x == "true"x ];then
+	neutralizeion=$negaion
+elif [ "$NeorPo"x == "false"x ];then
+	neutralizeion=$position
+else
+  echo "script not running, please ensure you want use negative_ion to neutralize_system or not."
+fi
+
+# box type and size
+if [ "${boxshape}"x == "orthorhombic"x ];then
+  boxsize="[${boxxyz} ]"
+elif [ "${boxshape}"x == "triclinic"x ];then
+  boxsize="[${boxxyz} 60.0 60.0 60.0 ]"
+else
+  boxsize=${boxsize}
+fi
+
+# report MD information
+cat<<OUT
+
+Jobs will run at $CPU_HOST;
+
+Your MD information is as follows:
+
+boxshape: ${boxshape}
+boxsize: ${boxsize}
+add salt: ${saltconcentration} M ${position}${negaion}
+add ion to neutral: ${neutralizeion}
+add solvent: ${solvent}
+forcefield: ${ffid}
+minimize_volume: ${minisys}
+
+OUT
+
+#check params
+fflist=("OPLS_2005" "OPLS3e" "OPLS4" "amber99SB-ILDN" "amber03" "amber99" "amber99SB" "charmm32" "charmm36_lipids" "S-OPLS")
+nagativeionlist=("F" "Cl" "Br" "I")
+positiveionlist=("Na" "K" "Li" "Rb" "Cs" "Mg2" "Ca2" "Zn2" "Fe2" "Fe3")
+solventlist=("SPC" "TIP3P" "TIP4P" "TIP5P" "DMSO" "METHANOL")
+boxlist=("orthorhombic" "triclinic" "dodecahedron_hexagon" "cubic")
+waterlist=("SPC" "TIP3P" "TIP4P" "TIP5P")
+function testarray (){
+testlogic=false
+for line in $2
+do
+if [ "$1"x == "$line"x ];then
+  testlogic=true;break;fi
+done
+if [ "${testlogic}"x == "true"x ];then
+  echo "Note: Parameter "$1" is vaild.";
+else
+  echo "Error: your parameter "$1" is unvaild, please check it." ;echo ""
+  exit
+fi
+}
+testarray $ffid "${fflist[*]}"
+testarray $boxshape "${boxlist[*]}"
+testarray $solvent "${solventlist[*]}"
+testarray $position "${positiveionlist[*]}"
+testarray $negaion "${nagativeionlist[*]}"
+
+# process water information
+for line in ${waterlist[@]}; do
+if [ "$solvent" == "$line" ];then
+  water="water = ${solvent}"
+  break
+fi; done
+
+# Check input file
+if ls $input >/dev/null 2>&1;then
+  echo "These mae files will be processed:"
+  for i in `ls $input`; do echo $i;done
+else
+  echo "Error: mae file not found, please check it."
+  exit
+fi
+echo ""
+
+cat<<EOF > system_build.msj
+task {
+  task = "desmond:auto"
+}
+
+build_geometry {
+  add_counterion = {
+       ion = ${neutralizeion}
+       number = neutralize_system
+  }
+  box = {
+     shape = ${boxshape}
+     size = ${boxsize}
+     size_type = buffer
+  }
+  override_forcefield = ${ffid}
+  rezero_system = ${rezerosys}
+  minimize_volume = ${minisys}
+  salt = {
+     concentration = ${saltconcentration}
+     negative_ion = ${negaion}
+     positive_ion = ${position}
+  }
+EOF
+
+# addsaltmore
+if [ "$addsaltmore"x == "true"x ];then
+  interactive_add_salt=yes
+  while [ "$interactive_add_salt"x == "yes"x ]
+  do
+    read -p "Set a concentration to new salt: " newconcentration
+    read -p "Set a negaion to new salt: " newnegaion
+    testarray $newnegaion "${nagativeionlist[*]}"
+    read -p "Set a position to new salt: " newposition
+    testarray $newposition "${positiveionlist[*]}"
+cat<< ADDSALT >> system_build.msj
+  salt = {
+     concentration = ${newconcentration}
+     negative_ion = ${newnegaion}
+     positive_ion = ${newposition}
+  }
+ADDSALT
+    read -p "Do you want to add salt? yes or no" interactive_add_salt
+  done
+fi
+
+cat<<OXOX >> system_build.msj
+  solvent = ${solvent}
+}
+
+assign_forcefield {
+  forcefield = ${ffid}
+  ${water}
+}
+OXOX
+
+for i in `ls $input`;do
+mkdir ${i%%.mae}-System_build
+cd ${i%%.mae}-System_build
+$Desmond/utilities/multisim -JOBNAME ${i%%.mae*}-System_build -m ../system_build.msj ../$i -o ../${i%%.mae*}-S.cms -HOST $CPU_HOST -maxjob 1
+cd ..
+done
+
+date
+cat<<FF
+
+All jobs are running!
+Please check the results of your task. 
+
+FF
