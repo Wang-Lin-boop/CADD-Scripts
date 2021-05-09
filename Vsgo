@@ -1,8 +1,6 @@
 #!/bin/bash
 
 #Database Path
-CBCF=/public/home/baifang/compounds_library/CBCF-lib
-SIAIS=/public/home/baifang/compounds_library/SIAIS-lib
 HMDB=/public/home/baifang/Database/HMDB
 Chemdiv=/public/home/baifang/compounds_library/Chemdiv_Feb2018
 ZincLead=/public/home/baifang/Database/Zinc_lead_like_ligprep_out
@@ -57,7 +55,7 @@ Input parameter:
 
 VS control parameter:
   -D    Which databases do you want to screen? Default is CBCF. <CBCF>
-            CBCF SIAIS Chemdiv ZincLead HMDB HMDBmembrane Drugbank TCMD CNCL are Supported.
+            Chemdiv ZincLead HMDB HMDBmembrane Drugbank TCMD CNCL are Supported.
             Different chemical libraries use different VS protocol. You usually do not need to change the settings specially.
   -d    Provide your own database path, the compounds files are recommended as maegz or SDF file format.
   -M    The maximum molecular weight your receptor can contain (usually your reference ligand +150) <550>
