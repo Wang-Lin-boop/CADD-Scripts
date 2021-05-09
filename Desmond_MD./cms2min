@@ -1,0 +1,170 @@
+#!/bin/bash
+help (){
+cat<<HELP
+
+Usage: cms2min [OPTION] <parameter>
+
+Minimize your Desmond MD system.
+
+Example: cms2min  -i *-S.cms -t 100 -H HPC_gpu02
+
+Input parameter:
+  -i	Use a file name (Multiple files are wrapped in "", and split by ' ') or regular expression to represent your input file, default is *-S.cms.
+
+MD control parameter:
+  -t    Enter the maximum simulation time for the Brownian motion simulation, in ps.
+
+Job control:
+  -H	Hostname of your queue, defult is HPC_GPU.
+  -D	Your Desmond path. </public/home/wanglin3/software/Desmond>
+
+Thank you for your using, If you found any problem, Please contact wanglin3@shanghaitech.edu.cn.
+HELP
+}
+
+input=*-S.cms
+time=100
+Host=HPC_GPU
+
+export Desmond=${Desmond}
+
+while getopts ":hi:t:H:D:" opt
+do
+  case $opt in
+    h)
+        help
+        exit;;
+    i)
+        input=$OPTARG;;
+    H)
+        Host=$OPTARG;;
+    t)
+        time=$OPTARG;;
+    D)
+        Desmond=$OPTARG;;
+    ?)
+        echo ""
+        echo "Error: Do not use undefined options."
+        echo ""
+        help
+        exit;;
+    esac
+done
+
+if [ -d ${Desmond} ];then
+  if [ "${Desmond}" == "" ];then
+    echo "Desmond not found. Please check your Desmond Path."
+    exit
+  fi
+  if [ "`grep -c $Host ${Desmond}/schrodinger.hosts`" == "0" ];then
+    echo $Host "Host not found."
+    exit
+  fi
+else
+  echo "Desmond not found. Please check your Desmond Path."
+  exit
+fi
+
+cat<<OUT
+
+Jobs will run at $Host
+
+Your simulate information is as follows:
+
+time: ${time} ps
+
+OUT
+
+if ls $input >/dev/null 2>&1;then
+  echo "These cms files will be processed:"
+  for i in $input; do echo $i;done
+  echo "These cms files will be geneated:"
+  for i in $input; do echo ${i%%.mae*}-M.cms;done
+else
+  echo "Error: cms file not found, please check it."
+  exit
+fi
+
+cat<<MSJ > min_job.msj
+task { task = "desmond:auto" }
+simulate { cfg_file = "min_job.cfg" jobname = "\$MASTERJOBNAME" dir = "." compress = "" }
+MSJ
+
+cat<<CFG > min_job.cfg
+backend = {
+}
+bigger_rclone = false
+checkpt = {
+   first = 0.0
+   interval = 240.06
+   name = "\$JOBNAME.cpt"
+   write_last_step = true
+}
+cpu = 1
+cutoff_radius = 9.0
+elapsed_time = 0.0
+energy_group = false
+eneseq = {
+   first = 0.0
+   interval = 1.2
+   name = "\$JOBNAME\$[_replica\$REPLICA\$].ene"
+}
+ensemble = {
+   brownie = {
+      delta_max = 0.1
+   }
+   class = NVT
+   method = Brownie
+   thermostat = {
+      tau = 1.0
+   }
+}
+glue = solute
+maeff_output = {
+   first = inf
+   interval = 120.0
+   name = "\$JOBNAME-out.cms"
+   periodicfix = true
+   trjdir = "\$JOBNAME\$[_replica\$REPLICA\$]_trj"
+}
+meta = false
+meta_file = ?
+randomize_velocity = {
+   first = 0.0
+   interval = inf
+   seed = 2007
+   temperature = "@*.temperature"
+}
+restrain = none
+simbox = {
+}
+taper = false
+temperature = [
+   [10.0 0 ]
+]
+time = 100.0
+timestep = [0.001 0.001 0.003 ]
+trajectory = {
+   center = []
+   first = 0.0
+   format = dtr
+   frames_per_file = 250
+   interval = 4.8
+   name = "\$JOBNAME\$[_replica\$REPLICA\$]_trj"
+   periodicfix = true
+   write_velocity = false
+}
+CFG
+
+for i in $input ; do
+$Desmond/utilities/multisim -JOBNAME ${i%%.cms*}-min -HOST HPC_CPU -SUBHOST $Host -maxjob 1 -cpu 1 -m min_job.msj -c min_job.cfg -description Minimization $i -o ${i%%.cms*}-M.cms -lic DESMOND_ACADEMIC:16
+done
+
+date
+cat<<FF
+
+All jobs are running!
+Please check the results of your task. 
+After jobs finished, use mdrun to perform MD.
+
+FF

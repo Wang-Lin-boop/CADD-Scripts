@@ -1,0 +1,262 @@
+#!/bin/bash
+help (){
+cat<<HELP
+
+Usage: mae2cms [OPTION] <parameter>
+
+Prepare your maestro structure files to Desmond MD system file and generate a summary for your MD system.
+
+Example: mae2cms -N -b cubic -p K -F amber99SB-ILDN -i *.mae 
+
+Input parameter:
+  -i	Use a file name (Multiple files are wrapped in "", and split by ' ') or regular expression to represent your input file, default is *.mae.
+
+MD control parameter:
+  -N	Do you want to use negative_ion to neutralize_system? 
+		Defulat is no. if you use this option, your systems will be neutralize by nagative_ion.
+  -b	Define a boxshape for your systems. <dodecahedron_hexagon>
+  -s	Define a boxsize for your systems.  <15.0>
+		for dodecahedron_hexagon and cubic, defulat is 15.0;
+		for orthorhombic or triclinic box, defulat is [15.0 15.0 15.0];
+		If you want use Orthorhombic or Triclinic box, your parameter should be like "15.0 15.0 15.0"
+  -p	What positive_ion do you want use to neutralize_system? <Na>
+		If your system in out of cell, defulat is Na.
+		If your system in cell, defulat is K.
+		Na, Li, K, Rb, Cs are predefined.
+  -n	What nagative_ion do you want use to neutralize_system? <Cl>
+		Whether your system is intracellular or extracellular, Cl is Recommended.
+		F, Cl, Br, I are predefined.
+  -w	Solvent model of your systems. <TIP3P>
+		SPC, TIP3P, TIP4P, TIP5P, DMSO, METHANOL are predefined.
+  -m	Find the orientation of the solutes that has the minimum box volume, and reorient the solutes. <true>
+  -c	Set a concentration to add salt, the unit is M. <0.15>
+  -C	Two options are supported here, incell or outcell.
+                outcell: The system will be established by adding 0.15 M NaCl and adjusting the number of Na ions to achieve neutrality.
+                incell: The system will be established by adding 0.15 M KCl and adjusting the number of K ions to achieve neutrality.
+  -F	Define a force field to build your systems, If your system contain ligand or non-standard residues, OPLS_2005 is Necessary.
+		OPLS_2005, amber99SB-ILDN, amber03, amber99, amber99SB, charmm32, charmm36_lipids are recommended.
+
+Job control:
+  -H	Hostname of your queue, defult is HPC_CPU.
+  -D	Your Desmond path. </public/home/wanglin3/software/Desmond>
+
+Thank you for your using, If you found any problem, Please contact wanglin3@shanghaitech.edu.cn.
+HELP
+}
+
+negaion=Cl
+solvent=TIP3P
+rezerosys=true
+minisys=true
+Host=HPC_CPU
+boxshape=dodecahedron_hexagon
+boxsize=15.0
+position=Na
+ffid=OPLS_2005
+NeorPo=false
+saltconcentration=0.15
+input=*.mae
+
+export Desmond=${Desmond}
+
+while getopts ":hNi:b:s:p:n:w:r:m:H:D:c:C:F:" opt
+do
+  case $opt in
+    h)
+      help
+      exit;;
+    N)
+      NeorPo=true;;
+    i)
+      input=$OPTARG;;
+    s)
+      boxsize=$OPTARG
+      boxxyz=${boxsize}
+      ;;
+    b)
+      boxshape=$OPTARG;;
+    p)
+      position=$OPTARG;;
+    n)
+      negaion=$OPTARG;;
+    w)
+      solvent=$OPTARG;;
+    m)
+      minisys=$OPTARG;;
+    H)
+      Host=$OPTARG;;
+    D)
+      Desmond=$OPTARG;;
+    c)
+      saltconcentration=$OPTARG;;
+    C)
+      if [ ${OPTARG}x == "incell"x ];then
+        negaion=Cl
+        position=K
+        saltconcentration=0.15
+        NeorPo=false
+        solvent=TIP3P
+      elif [ ${OPTARG}x == "outcell"x ];then
+        negaion=Cl
+        position=Na
+        saltconcentration=0.15
+        NeorPo=false
+        solvent=TIP3P
+      else
+        echo "Error: your parameter of -C option is unvaild, please check it."
+      fi;;
+    F)
+      ffid=$OPTARG;;
+    ?)
+      echo ""
+      echo "Error: Do not use undefined options."
+      echo ""
+      help
+      exit;;
+  esac
+done
+
+if [ -d ${Desmond} ];then
+  if [ "${Desmond}" == "" ];then
+    echo "Desmond not found. Please check your Desmond Path."
+    exit
+  fi
+  if [ "`grep -c $Host ${Desmond}/schrodinger.hosts`" == "0" ];then
+    echo $Host "Host not found."
+    exit
+  fi
+else
+  echo "Desmond not found. Please check your Desmond Path."
+  exit
+fi
+
+if [ "$NeorPo"x == "true"x ];then
+	neutralizeion=$negaion
+elif [ "$NeorPo"x == "false"x ];then
+	neutralizeion=$position
+else
+  echo "script not running, please ensure you want use negative_ion to neutralize_system or not."
+fi
+
+
+if [ "${boxshape}"x == "orthorhombic"x ];then
+  boxsize="[15.0 15.0 15.0 ]"
+  boxsize="[${boxxyz} ]"
+elif [ "${boxshape}"x == "triclinic"x ];then
+  boxsize="[${boxxyz} 60.0 60.0 60.0 ]"
+else
+  boxsize=${boxsize}
+fi
+
+cat<<OUT
+
+Jobs will run at $Host
+
+Your system information is as follows:
+
+boxshape: ${boxshape}
+boxsize: ${boxsize}
+add salt: ${saltconcentration} M ${position}${negaion}
+add ion to neutral: ${neutralizeion}
+add solvent: ${solvent}
+forcefield: ${ffid}
+minimize_volume: ${minisys}
+
+OUT
+
+fflist=("OPLS_2005" "OPLS3e" "amber99SB-ILDN" "amber03" "amber99" "amber99SB" "charmm32" "charmm36_lipids")
+nagativeionlist=("F" "Cl" "Br" "I")
+positiveionlist=("Na" "K" "Li" "Rb" "Cs")
+solventlist=("SPC" "TIP3P" "TIP4P" "TIP5P" "DMSO" "METHANOL")
+boxlist=("orthorhombic" "triclinic" "dodecahedron_hexagon" "cubic")
+
+testarray (){
+testlogic=false
+for line in $2
+do
+if [ "$1"x == "$line"x ];then
+  testlogic=true;break;fi
+done
+if [ "${testlogic}"x == "true"x ];then
+  echo "Note: Parameter "$1" is vaild.";
+else
+  echo "" ; echo $(eval echo \${$2[@]})" are supported to this option."
+  echo "Error: your parameter "$1" is unvaild, please check it." ;echo ""
+  exit
+fi
+}
+
+testarray $ffid "${fflist[*]}"
+testarray $boxshape "${boxlist[*]}"
+testarray $solvent "${solventlist[*]}"
+testarray $position "${positiveionlist[*]}"
+testarray $negaion "${nagativeionlist[*]}"
+
+if ls $input >/dev/null 2>&1;then
+  echo "These mae files will be processed:"
+  for i in $input; do echo $i;done
+  echo "These cms files will be geneated:"
+  for i in $input; do echo ${i%%.mae*}-S.cms;done
+else
+  echo "Error: mae file not found, please check it."
+  exit
+fi
+
+waterlist=("SPC" "TIP3P" "TIP4P" "TIP5P")
+for line in ${waterlist[@]}
+do
+if [ "$solvent" == "$line" ];then
+  water="water = ${solvent}"
+  break
+fi
+done
+
+read -p "Are these settings correct? Please check again. Press Enter to continue and enter NO or Ctrl+C to exit! " gogogo
+if [ "$gogogo"x == "NO"x ];then
+  exit
+fi
+
+cat <<EOF > system_build.msj
+task {
+  task = "desmond:auto"
+}
+
+build_geometry {
+  add_counterion = {
+       ion = ${neutralizeion}
+       number = neutralize_system
+  }
+  box = {
+     shape = ${boxshape}
+     size = ${boxsize}
+     size_type = buffer
+  }
+  override_forcefield = ${ffid}
+  rezero_system = ${rezerosys}
+  minimize_volume = ${minisys}
+  salt = {
+     concentration = ${saltconcentration}
+     negative_ion = ${negaion}
+     positive_ion = ${position}
+  }
+  solvent = ${solvent}
+}
+
+assign_forcefield {
+  forcefield = ${ffid}
+  ${water}
+}
+EOF
+
+for i in $input ;do
+$Desmond/utilities/multisim -JOBNAME ${i%%.mae*}-System_build -m ./system_build.msj $i -o ${i%%.mae*}-S.cms -HOST $Host -TMPLAUNCHDIR -maxjob 1
+done
+
+date
+cat<<FF
+
+All jobs are running!
+Please check the results of your task. 
+After the system is established, use cms2min to perform the minimization task.
+
+FF
