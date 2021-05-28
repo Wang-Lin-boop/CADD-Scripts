@@ -25,9 +25,9 @@
     PRECISION="SP"
     OUT_com=1
     Prime=10
-    Ligand_ASL="Z:999"
+    Ligand_ASL="A:999"
     Force_Field="OPLS_2005"
-    Distance=3.4
+    Distance=5.0
 
     Mode_List=("Normal" "Grid" "COMPD" "COMPI" "SITEMAP" "GCD" "GCI")
     VAILD_PRECISION=("SP" "XP" "HTVS")
@@ -91,8 +91,8 @@ XDock control parameter:
   -n    Number of pose per ligand. <1>
   -o    Number of Top Complexes to Output. <1>
   -x    The PRECISION of Docking, SP, XP and HTVS are supported. Default is SP.
-  -A    Reference Ligand ASL to induce Fit Docking. Such as: "A:0"
-  -D    residues within the specified distance will be set to flexible in Induce Fit Docking. default is 3.4 Å.
+  -A    Reference Ligand ASL to induce Fit Docking. Such as: "A:999"
+  -D    residues within the specified distance will be set to flexible in Induce Fit Docking. default is 5.0 Å.
   -F    Force Field in Induce Fit Docking, OPLS_2005, OPLS3e or OPLS4.
 
 Job control:
@@ -219,6 +219,7 @@ if [ $ProPrep == "true" ];then
         mkdir ${Protein_Input}-OUT
         ls $Protein_Input | parallel -j $Njobs $rosetta_app/score_jd2.static.linuxgccrelease -database $rosetta_db -in:file:s ${Protein_Input}/{} -out:file:scorefile ${Protein_Input}_jd2.sc -out:path:pdb ${Protein_Input}-OUT -score:weights ref2015_cart -out:pdb -ex1 -ex2aro -ignore_zero_occupancy false -in:ignore_unrecognized_res true
         Protein_to_DOCK=${Protein_Input}-OUT
+        PPREP="FALSE"
     elif [ $Rosetta_Jd2_or_Schrodinger == "Schrodinger" ];then
         PPREP="TRUE"
         Protein_to_DOCK=${Protein_Input}
@@ -349,37 +350,43 @@ fi # Xglide Module
 
 # Induce Fit Module
 if [ "$Induce_Fit"x == "true"x ];then
-
-    mkdir ${Protein_Input}-MAE
-    ls $Protein_to_DOCK | parallel -j ${Njobs} $SCHRODINGER/utilities/structconvert -a $Protein_to_DOCK/{} Proteins_to_InduceFitDock.maegz
-    ls $Ligand_Input | parallel -j ${Njobs} $SCHRODINGER/utilities/structconvert -a ${Ligand_Input}/{} Ligands_to_InduceFitDock.maegz
+    for i in `ls ${Protein_to_DOCK}`;do
+    $SCHRODINGER/utilities/structcat -i ${Protein_to_DOCK}/${i} -o Proteins_to_InduceFitDock.maegz ; done
+    for i in `ls $Ligand_Input`;do
+    $SCHRODINGER/utilities/structcat -i ${Ligand_Input}/${i} -o Ligands_to_InduceFitDock.maegz;done
     if [ $By_Complex == "true" ];then
         BINDING_SITE="ligand ${Ligand_ASL}"
     elif [ $By_Center == "true" ];then
-        BINDING_SITE="coords${Grid_Center}"
+        BINDING_SITE="coords ${Grid_Center}"
     else
         echo "Induce Fit Docking cannot to using SiteMap."
     fi 
 cat<<IFT1 > IFT.inp
 INPUT_FILE  Proteins_to_InduceFitDock.maegz
+IFT1
 
-STAGE GLIDE_DOCKING
+if [ $ProPrep == "true" ];then
+    echo "STAGE PPREP
+    RMSD    0.5
+    " >>  IFT.inp
+fi
+
+cat<<IFT2 >> IFT.inp
+STAGE VDW_SCALING
+  BINDING_SITE ${BINDING_SITE}
+
+STAGE PREDICT_FLEXIBILITY
+  BINDING_SITE  ${BINDING_SITE}
+
+STAGE INITIAL_DOCKING
   BINDING_SITE  ${BINDING_SITE}
   INNERBOX 12.0
   OUTERBOX 30.0
-  LIGAND_FILE  Ligands_to_InduceFitDock.maegz
+  LIGAND_FILE Ligands_to_InduceFitDock.maegz
   LIGANDS_TO_DOCK all
-  GRIDGEN_RECEP_CCUT  0.25
-  GRIDGEN_RECEP_VSCALE 0.50
-  GRIDGEN_FORCEFIELD ${Force_Field}
-  DOCKING_PRECISION ${PRECISION}
-  DOCKING_LIG_CCUT  0.15
-  DOCKING_CV_CUTOFF  100.0
-  DOCKING_LIG_VSCALE 0.50
-  DOCKING_POSES_PER_LIG 30
-  DOCKING_FORCEFIELD ${Force_Field}
-  DOCKING_RINGCONFCUT 2.5
+  DOCKING_RINGCONFCUT 10.0
   DOCKING_AMIDE_MODE penal
+  DOCKING_FORCEFIELD ${Force_Field}
 
 STAGE COMPILE_RESIDUE_LIST
   DISTANCE_CUTOFF ${Distance}
@@ -397,22 +404,16 @@ STAGE SORT_AND_FILTER
   POSE_FILTER r_psp_Prime_Energy
   POSE_KEEP 20#
 
-STAGE GLIDE_DOCKING
+STAGE GLIDE_DOCKING2
   BINDING_SITE ligand Z:999
-  RECEPTOR_SCALE 1.00
-  RECEPTOR_CCUT 0.25
-  LIGAND_FILE InducedFit1.mae
-  LIGANDS_TO_DOCK self
-  MULTI_LIG_CONF yes
-  LIGAND_SCALE 0.80
-  LIGAND_CCUT 0.15
-  CV_CUTOFF 0.0
-  HBOND_CUTOFF 0.0
-  INNER_BOX 10.0
-  MAX_POSESPERLIG 1
-  MMIM_LIG_RINGCONFCUT 2.5
-  AMIDE_MODE penal
-  OUTER_BOX auto
+  INNERBOX 10.0
+  OUTERBOX auto
+  LIGAND_FILE Ligands_to_InduceFitDock.maegz
+  LIGANDS_TO_DOCK existing
+  DOCKING_PRECISION SP
+  DOCKING_CANONICALIZE False
+  DOCKING_RINGCONFCUT 10.0
+  DOCKING_AMIDE_MODE penal
   PRECISION ${PRECISION}
   DOCKING_FORCEFIELD ${Force_Field}
 
@@ -422,7 +423,7 @@ STAGE SCORING
   TERM 0.05,r_psp_Prime_Energy,1
   REPORT_FILE report.csv
 
-IFT1
+IFT2
 
 echo "Submitting Induce Fit Docking Jobs......"
 echo ""
