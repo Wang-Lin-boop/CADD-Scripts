@@ -22,7 +22,7 @@
 
     #INPUT
     input=*.zip
-    Mode="Normal"
+    Running_Mode="Fast"
 
     #Setting
     PH=7.0
@@ -191,7 +191,7 @@ Input parameter:
     @ or Custom Running Mode, e.g. -m "EDL+R+HTVS+CD"
 
 Control parameters:
-  -F    Force Fields, OPLS_2005, OPLS3e or OPLS4.
+  -F    Force Fields, OPLS_2005, OPLS3e or OPLS4.<OPLS4>
   -T    Set a Job Name. Default is "Grid_name-Database_name-Run_Mode".
   -C    Aattach residue number on receptor, required in Covalent Docking.
             e.g. "cys:A:1425", the A is chain name and 145 is the atom number(Heavy atom). 
@@ -224,7 +224,7 @@ Thank you for your using, If you found any problem, Please contact wanglin3@shan
 HELP
 }
 
-while getopts ":hi:D:d:m:R:A:B:L:r:H:a:C:b:c:X:H:P:N:S:" opt
+while getopts ":hOi:D:d:m:T:R:a:e:C:b:p:q:c:H:N:P:G:L:A:Q:K:M:S:F:" opt
 do
   case $opt in
     h)
@@ -279,6 +279,8 @@ do
         MACROMODEL=$OPTARG;;
     S)
         SCHRODINGER=$OPTARG;;
+    F)
+        Force_Field=$OPTARG;;
     ?)
         echo ""
         echo "Error: Do not use undefined options."
@@ -311,10 +313,14 @@ Parse_Running_Mode(){
         Pipeline="HTVS_local+SP_local+MMGBSA_OPT"
     else 
         Pipeline=$Running_Mode
+        Running_Mode="User_Defined"
     fi
 }
 
 Params_check_and_report(){
+
+Work_Dir=${PWD}
+
 # Check SCHRODINGER and Host
 if [ -d ${SCHRODINGER} ];then
   if [ "${SCHRODINGER}" == "" ];then
@@ -362,21 +368,20 @@ fi
 
 cat<<OUTPUTLOG
 Virtual Screening Workflow Parameter:
-Job Dir: ${PWD}
+Job Dir: ${Work_Dir}
 Input Files: ${input}
 Database: ${Database_Location}
 Running Mode: ${Running_Mode}
 ${Reference_Ligand_notice}
 
 OUTPUTLOG
-
 }
 
 setGrid(){
 cat<<GRID >> ${Inp_Name}
 [SET:GRID]
     VARCLASS   Grid
-    FILE    "${PWD}/${INPUT}"
+    FILE    "${Work_Dir}/${INPUT}"
 GRID
 }
 
@@ -401,7 +406,7 @@ SETDB
         echo -n "   FILES   " >> ${Inp_Name}
         for file in `ls ${Database_Location}`;do
             if [ ${file##*.} == "mae" ] || [ ${file##*.} == "maegz" ] || [ ${file##*.} == "sdf" ] || [ ${file##*.} == "smi" ];then
-                echo -n "${file}," >> ${Inp_Name}
+                echo -n "${Database_Location}/${file}," >> ${Inp_Name}
             else
                 echo "Warning: Your input ${Database_Location}/${file} is not recognized."
             fi
@@ -434,7 +439,7 @@ cat<<QIKPROP >> ${Inp_Name}
     INPUTS   PRE_QIKPROP_RECOMBINE_OUT,
     OUTPUTS   QIKPROP_OUT,
     RECOMBINE   YES
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   QIKPROP_OUT,
     STRUCTOUT   QIKPROP_OUT
 QIKPROP
@@ -448,7 +453,7 @@ cat<<5R >> ${Inp_Name}
     INPUTS   ${Ligand_name},
     OUTPUTS   5R_OUT,
     CONDITIONS   "r_qp_mol_MW <= 500", "r_qp_QPlogPo/w <= 5", "r_qp_donorHB <= 5", "r_qp_accptHB <= 10", "r_qp_PSA <= 120"
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   5R_OUT,
     STRUCTOUT   5R_OUT
 5R
@@ -462,7 +467,7 @@ cat<<BBB >> ${Inp_Name}
     INPUTS   ${Ligand_name},
     OUTPUTS   BBB_OUT,
     CONDITIONS   "r_qp_mol_MW <= 450", "r_qp_QPlogPo/w <= 5 AND > 2", "r_qp_PSA <= 90", "Num_rotatable_bonds <= 8","r_qp_donorHB <= 3", "r_qp_QPlogBB >= -3.0 AND <= 1.2", "r_qp_QPPMDCK >= 25"
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   BBB_OUT,
     STRUCTOUT   BBB_OUT
 BBB
@@ -476,7 +481,7 @@ cat<<3R >> ${Inp_Name}
     INPUTS   ${Ligand_name},
     OUTPUTS   3R_OUT,
     CONDITIONS   "r_qp_QPlogS > -5.7", "r_qp_QPPCaco > 22", "r_qp_accptHB <= 10", "r_qp_#metab < 7"
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   3R_OUT,
     STRUCTOUT   3R_OUT
 3R
@@ -490,7 +495,7 @@ cat<<R5R >> ${Inp_Name}
     INPUTS   ${Ligand_name},
     OUTPUTS   R5R_OUT,
     CONDITIONS   "r_qp_mol_MW <= 650", "r_qp_QPlogPo/w <= 7", "r_qp_donorHB <= 6", "r_qp_accptHB <= 20"
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   R5R_OUT,
     STRUCTOUT   R5R_OUT
 R5R
@@ -504,7 +509,7 @@ cat<<Star >> ${Inp_Name}
     INPUTS   ${Ligand_name},
     OUTPUTS   Star_OUT,
     CONDITIONS   "r_qp_#Star <= 5"
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   Star_OUT,
     STRUCTOUT   Star_OUT
 Star
@@ -518,7 +523,7 @@ cat<<Oral >> ${Inp_Name}
     INPUTS   ${Ligand_name},
     OUTPUTS   Oral_OUT,
     CONDITIONS   "r_qp_HumanOralAbsorption >= 2"
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   Oral_OUT,
     STRUCTOUT   Oral_OUT
 Oral
@@ -532,7 +537,7 @@ cat<<Oral_Drug >> ${Inp_Name}
     INPUTS   ${Ligand_name},
     OUTPUTS   Oral_Drug_OUT,
     CONDITIONS   "r_qp_RuleOfFive < 2", "r_qp_RuleOfThree < 2"
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   Oral_Drug_OUT,
     STRUCTOUT   Oral_Drug_OUT
 Oral_Drug
@@ -594,7 +599,7 @@ NR
     Ligand_name="NR_OUT"
 }
 
-NPSE(
+NPSE(){
 cat<<NPSE >> ${Inp_Name}
 [STAGE:NPSE]
     STAGECLASS   filtering.LigFilterStage
@@ -603,7 +608,7 @@ cat<<NPSE >> ${Inp_Name}
     CONDITIONS   "Phosphonate_esters = 0", "Sulphonate_esters = 0"
 NPSE
     Ligand_name="NPSE_OUT"
-)
+}
 
 No_Dup(){
 cat<<No_Dup >> ${Inp_Name}
@@ -628,7 +633,7 @@ cat<<Warhead >> ${Inp_Name}
     INPUTS   ${Ligand_name},
     OUTPUTS   Warhead_SO_OUT,
     CONDITIONS   "Michael_acceptors >= 1 OR [B]([O])[O] >= 1 OR [C;r3][O;r3][C;r3] >= 1 OR [S;X2;H1] >= 1 OR [C]#[N] >=1 OR [O-0X1]=[C]1[C][C][N]1 >= 1 OR [O]=[C,c]-[C,c]=[O] >=1 OR NC(=O)C(=O)C(C)N >= 1 OR [C,c]=[C,c]-[C,c]#[N,n] >= 1 OR [C-0X2]#[C-0X2][C-0X3]=[O-0X1] >= 1 OR [C][S][S][H] >= 1 OR [N]=[O,S] >= 1 OR [N]=[C]=[S] >= 1 OR  [C;H1]([Cl])-[C](=[O]) >= 1  OR  [C]=[C][c][n] >= 1"
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   Warhead_OUT,
     STRUCTOUT   Warhead_OUT
 Warhead
@@ -680,7 +685,7 @@ cat<<IONIZE >> ${Inp_Name}
     NUM_STEREOISOMERS   16
     MAX_STEREOISOMERS   8
     REGULARIZE   NO
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   IONIZE_OUT,
     STRUCTOUT   IONIZE_OUT
 IONIZE
@@ -724,7 +729,7 @@ cat<<EPIK4 >> ${Inp_Name}
     NUM_STEREOISOMERS   16
     MAX_STEREOISOMERS   4
     REGULARIZE   NO
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   EPIK4_OUT,
     STRUCTOUT   EPIK4_OUT
 EPIK4
@@ -768,7 +773,7 @@ cat<<EPIK32 >> ${Inp_Name}
     NUM_STEREOISOMERS   64
     MAX_STEREOISOMERS   32
     REGULARIZE   NO
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   EPIK32_OUT,
     STRUCTOUT   EPIK32_OUT
 EPIK32
@@ -800,7 +805,7 @@ cat<<RS1 >> ${Inp_Name}
     CHARGES_FROM    Force field
     MAXIMUM_ITERATION   300
     OUTCONFS_PER_SEARCH 2
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   RS1_OUT,
     STRUCTOUT   RS1_OUT
 RS1
@@ -832,7 +837,7 @@ cat<<RS4 >> ${Inp_Name}
     CHARGES_FROM    Force field
     MAXIMUM_ITERATION   500
     OUTCONFS_PER_SEARCH 8
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   RS4_OUT,
     STRUCTOUT   RS4_OUT
 RS4
@@ -864,7 +869,7 @@ cat<<RS_Fast >> ${Inp_Name}
     CHARGES_FROM    Force field
     MAXIMUM_ITERATION   100
     OUTCONFS_PER_SEARCH 2
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   RS_Fast_OUT,
     STRUCTOUT   RS_Fast_OUT
 RS_Fast
@@ -899,7 +904,7 @@ cat<<CONFGEN >> ${Inp_Name}
     MAXIMUM_ITERATION   5000
     OUTCONFS_PER_SEARCH 8
     CUTOFF   Extended
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   CONFGEN_OUT,
     STRUCTOUT   CONFGEN_OUT
 [STAGE:COMBINE]
@@ -940,7 +945,7 @@ cat<<CONFGEN >> ${Inp_Name}
     MAXIMUM_ITERATION   1000
     OUTCONFS_PER_SEARCH 4
     CUTOFF   Extended
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   CONFGEN_Fast_OUT,
     STRUCTOUT   CONFGEN_Fast_OUT
 [STAGE:COMBINE]
@@ -981,7 +986,7 @@ cat<<MMFF_CONFGEN >> ${Inp_Name}
     MAXIMUM_ITERATION   5000
     OUTCONFS_PER_SEARCH 8
     CUTOFF   Extended
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   MMFF_CONFGEN_OUT,
     STRUCTOUT   MMFF_CONFGEN_OUT
 [STAGE:COMBINE]
@@ -1041,7 +1046,7 @@ cat<<MMFF_CONFGEN >> ${Inp_Name}
     OUTPUTS   CONFGEN_COMBINED,
     LABELFIELD   s_vsw_conformer_field
     LABELS   Original, OPLS, MMFFS
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   CONFGEN_COMBINED,
     STRUCTOUT   CONFGEN_COMBINED
 MMFF_CONFGEN
@@ -1096,7 +1101,7 @@ cat<<HTVS >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   HTVS_OUT,
     STRUCTOUT   HTVS_OUT
 [STAGE:PULL_HTVS]
@@ -1150,7 +1155,7 @@ cat<<HTVS >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   HTVS_OUT,
     STRUCTOUT   HTVS_OUT
 [STAGE:PULL_HTVS]
@@ -1203,7 +1208,7 @@ cat<<HTVS >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   HTVS_OUT,
     STRUCTOUT   HTVS_OUT
 [STAGE:PULL_HTVS]
@@ -1256,13 +1261,13 @@ cat<<HTVS >> ${Inp_Name}
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
     USE_REF_LIGAND  YES
-    REF_LIGAND_FILE ${PWD}/${Reference_Ligand}
+    REF_LIGAND_FILE ${Work_Dir}/${Reference_Ligand}
     CORE_DEFINITION mcssmarts
     CORE_RESTRAIN   YES
     CORE_SNAP   YES
     CORE_POS_MAX_RMSD   0.52
     CORECONS_FALLBACK   YES
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   HTVS_OUT,
     STRUCTOUT   HTVS_OUT
 [STAGE:PULL_HTVS]
@@ -1316,7 +1321,7 @@ cat<<HTVS >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   HTVS_OUT,
     STRUCTOUT   HTVS_OUT
 [STAGE:PULL_HTVS]
@@ -1369,7 +1374,7 @@ cat<<HTVS >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   HTVS_OUT,
     STRUCTOUT   HTVS_OUT
 [STAGE:PULL_HTVS]
@@ -1421,7 +1426,7 @@ cat<<SP >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   SP_OUT,
     STRUCTOUT   SP_OUT
 SP
@@ -1469,7 +1474,7 @@ cat<<SP >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   SP_OUT,
     STRUCTOUT   SP_OUT
 SP
@@ -1519,7 +1524,7 @@ cat<<SP >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   SP_OUT,
     STRUCTOUT   SP_OUT
 SP
@@ -1568,13 +1573,13 @@ cat<<SP >> ${Inp_Name}
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
     USE_REF_LIGAND  YES
-    REF_LIGAND_FILE ${PWD}/${Reference_Ligand}
+    REF_LIGAND_FILE ${Work_Dir}/${Reference_Ligand}
     CORE_DEFINITION mcssmarts
     CORE_RESTRAIN   YES
     CORE_SNAP   YES
     CORE_POS_MAX_RMSD   0.52
     CORECONS_FALLBACK   YES
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   SP_OUT,
     STRUCTOUT   SP_OUT
 SP
@@ -1623,7 +1628,7 @@ cat<<SP >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   SP_OUT,
     STRUCTOUT   SP_OUT
 SP
@@ -1673,7 +1678,7 @@ cat<<SP >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   SP_OUT,
     STRUCTOUT   SP_OUT
 SP
@@ -1721,7 +1726,7 @@ cat<<SP >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   SP_OUT,
     STRUCTOUT   SP_OUT
 SP
@@ -1768,7 +1773,7 @@ cat<<XP >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   XP_OUT,
     STRUCTOUT   XP_OUT
 XP
@@ -1817,7 +1822,7 @@ cat<<XP >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   XP_OUT,
     STRUCTOUT   XP_OUT
 XP
@@ -1868,7 +1873,7 @@ cat<<XP >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   XP_OUT,
     STRUCTOUT   XP_OUT
 XP
@@ -1918,13 +1923,13 @@ cat<<XP >> ${Inp_Name}
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
     USE_REF_LIGAND  YES
-    REF_LIGAND_FILE ${PWD}/${Reference_Ligand}
+    REF_LIGAND_FILE ${Work_Dir}/${Reference_Ligand}
     CORE_DEFINITION mcssmarts
     CORE_RESTRAIN   YES
     CORE_SNAP   YES
     CORE_POS_MAX_RMSD   0.52
     CORECONS_FALLBACK   YES
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   XP_OUT,
     STRUCTOUT   XP_OUT
 XP
@@ -1974,7 +1979,7 @@ cat<<XP >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   XP_OUT,
     STRUCTOUT   XP_OUT
 XP
@@ -2023,7 +2028,7 @@ cat<<XP >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   XP_OUT,
     STRUCTOUT   XP_OUT
 XP
@@ -2072,7 +2077,7 @@ cat<<XP >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   XP_OUT,
     STRUCTOUT   XP_OUT
 XP
@@ -2087,11 +2092,10 @@ cat<<Cluster >> ${Inp_Name}
     ATOM_TYPING_SCHEME    12
     INPUTS    ${Ligand_name},
     OUTPUTS    Linear_Tanimoto_Cluster_OUT,
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS    Linear_Tanimoto_Cluster_OUT,
     STRUCTOUT    Linear_Tanimoto_Cluster_OUT
 Cluster
-   Ligand_name="Linear_Tanimoto_Cluster_OUT"
 }
 Radial_Tanimoto(){
 cat<<Cluster >> ${Inp_Name}
@@ -2101,11 +2105,10 @@ cat<<Cluster >> ${Inp_Name}
     ATOM_TYPING_SCHEME    12
     INPUTS    ${Ligand_name},
     OUTPUTS    Radial_Tanimoto_Cluster_OUT,
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS    Radial_Tanimoto_Cluster_OUT,
     STRUCTOUT    Radial_Tanimoto_Cluster_OUT
 Cluster
-   Ligand_name="Radial_Tanimoto_Cluster_OUT"
 }
 MolPrint2D_Tanimoto(){
 cat<<Cluster >> ${Inp_Name}
@@ -2115,11 +2118,10 @@ cat<<Cluster >> ${Inp_Name}
     ATOM_TYPING_SCHEME    12
     INPUTS    ${Ligand_name},
     OUTPUTS    MolPrint2D_Tanimoto_Cluster_OUT,
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS    MolPrint2D_Tanimoto_Cluster_OUT,
     STRUCTOUT    MolPrint2D_Tanimoto_Cluster_OUT
 Cluster
-   Ligand_name="MolPrint2D_Tanimoto_Cluster_OUT"
 }
 Topo_Tanimoto(){
 cat<<Cluster >> ${Inp_Name}
@@ -2129,11 +2131,10 @@ cat<<Cluster >> ${Inp_Name}
     ATOM_TYPING_SCHEME    12
     INPUTS    ${Ligand_name},
     OUTPUTS    Topo_Tanimoto_Cluster_OUT,
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS    Topo_Tanimoto_Cluster_OUT,
     STRUCTOUT    Topo_Tanimoto_Cluster_OUT
 Cluster
-   Ligand_name="Topo_Tanimoto_Cluster_OUT"
 }
 Dendritic_Tanimoto(){
 cat<<Cluster >> ${Inp_Name}
@@ -2143,11 +2144,10 @@ cat<<Cluster >> ${Inp_Name}
     ATOM_TYPING_SCHEME    12
     INPUTS    ${Ligand_name},
     OUTPUTS    Dendritic_Tanimoto_Cluster_OUT,
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS    Dendritic_Tanimoto_Cluster_OUT,
     STRUCTOUT    Dendritic_Tanimoto_Cluster_OUT
 Cluster
-   Ligand_name="Dendritic_Tanimoto_Cluster_OUT"
 }
 Linear_Euclidean(){
 cat<<Cluster >> ${Inp_Name}
@@ -2157,11 +2157,10 @@ cat<<Cluster >> ${Inp_Name}
     ATOM_TYPING_SCHEME    12
     INPUTS    ${Ligand_name},
     OUTPUTS    Linear_Euclidean_Cluster_OUT,
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS    Linear_Euclidean_Cluster_OUT,
     STRUCTOUT    Linear_Euclidean_Cluster_OUT
 Cluster
-   Ligand_name="Linear_Euclidean_Cluster_OUT"
 }
 Radial_Euclidean(){
 cat<<Cluster >> ${Inp_Name}
@@ -2171,11 +2170,10 @@ cat<<Cluster >> ${Inp_Name}
     ATOM_TYPING_SCHEME    12
     INPUTS    ${Ligand_name},
     OUTPUTS    Radial_Euclidean_Cluster_OUT,
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS    Radial_Euclidean_Cluster_OUT,
     STRUCTOUT    Radial_Euclidean_Cluster_OUT
 Cluster
-   Ligand_name="Radial_Euclidean_Cluster_OUT"
 }
 MolPrint2D_Euclidean(){
 cat<<Cluster >> ${Inp_Name}
@@ -2185,11 +2183,10 @@ cat<<Cluster >> ${Inp_Name}
     ATOM_TYPING_SCHEME    12
     INPUTS    ${Ligand_name},
     OUTPUTS    MolPrint2D_Euclidean_Cluster_OUT,
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS    MolPrint2D_Euclidean_Cluster_OUT,
     STRUCTOUT    MolPrint2D_Euclidean_Cluster_OUT
 Cluster
-   Ligand_name="MolPrint2D_Euclidean_Cluster_OUT"
 }
 Topo_Euclidean(){
 cat<<Cluster >> ${Inp_Name}
@@ -2199,11 +2196,10 @@ cat<<Cluster >> ${Inp_Name}
     ATOM_TYPING_SCHEME    12
     INPUTS    ${Ligand_name},
     OUTPUTS    Topo_Euclidean_Cluster_OUT,
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS    Topo_Euclidean_Cluster_OUT,
     STRUCTOUT    Topo_Euclidean_Cluster_OUT
 Cluster
-   Ligand_name="Topo_Euclidean_Cluster_OUT"
 }
 Dendritic_Euclidean(){
 cat<<Cluster >> ${Inp_Name}
@@ -2213,11 +2209,10 @@ cat<<Cluster >> ${Inp_Name}
     ATOM_TYPING_SCHEME    12
     INPUTS    ${Ligand_name},
     OUTPUTS    Dendritic_Euclidean_Cluster_OUT,
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS    Dendritic_Euclidean_Cluster_OUT,
     STRUCTOUT    Dendritic_Euclidean_Cluster_OUT
 Cluster
-   Ligand_name="Dendritic_Euclidean_Cluster_OUT"
 }
 Linear_Cosine(){
 cat<<Cluster >> ${Inp_Name}
@@ -2227,11 +2222,10 @@ cat<<Cluster >> ${Inp_Name}
     ATOM_TYPING_SCHEME    12
     INPUTS    ${Ligand_name},
     OUTPUTS    Linear_Cosine_Cluster_OUT,
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS    Linear_Cosine_Cluster_OUT,
     STRUCTOUT    Linear_Cosine_Cluster_OUT
 Cluster
-   Ligand_name="Linear_Cosine_Cluster_OUT"
 }
 Radial_Cosine(){
 cat<<Cluster >> ${Inp_Name}
@@ -2241,11 +2235,10 @@ cat<<Cluster >> ${Inp_Name}
     ATOM_TYPING_SCHEME    12
     INPUTS    ${Ligand_name},
     OUTPUTS    Radial_Cosine_Cluster_OUT,
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS    Radial_Cosine_Cluster_OUT,
     STRUCTOUT    Radial_Cosine_Cluster_OUT
 Cluster
-   Ligand_name="Radial_Cosine_Cluster_OUT"
 }
 MolPrint2D_Cosine(){
 cat<<Cluster >> ${Inp_Name}
@@ -2255,11 +2248,10 @@ cat<<Cluster >> ${Inp_Name}
     ATOM_TYPING_SCHEME    12
     INPUTS    ${Ligand_name},
     OUTPUTS    MolPrint2D_Cosine_Cluster_OUT,
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS    MolPrint2D_Cosine_Cluster_OUT,
     STRUCTOUT    MolPrint2D_Cosine_Cluster_OUT
 Cluster
-   Ligand_name="MolPrint2D_Cosine_Cluster_OUT"
 }
 Topo_Cosine(){
 cat<<Cluster >> ${Inp_Name}
@@ -2269,11 +2261,10 @@ cat<<Cluster >> ${Inp_Name}
     ATOM_TYPING_SCHEME    12
     INPUTS    ${Ligand_name},
     OUTPUTS    Topo_Cosine_Cluster_OUT,
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS    Topo_Cosine_Cluster_OUT,
     STRUCTOUT    Topo_Cosine_Cluster_OUT
 Cluster
-   Ligand_name="Topo_Cosine_Cluster_OUT"
 }
 Dendritic_Cosine(){
 cat<<Cluster >> ${Inp_Name}
@@ -2283,11 +2274,10 @@ cat<<Cluster >> ${Inp_Name}
     ATOM_TYPING_SCHEME    12
     INPUTS    ${Ligand_name},
     OUTPUTS    Dendritic_Cosine_Cluster_OUT,
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS    Dendritic_Cosine_Cluster_OUT,
     STRUCTOUT    Dendritic_Cosine_Cluster_OUT
 Cluster
-   Ligand_name="Dendritic_Cosine_Cluster_OUT"
 }
 Linear_Soergel(){
 cat<<Cluster >> ${Inp_Name}
@@ -2297,11 +2287,10 @@ cat<<Cluster >> ${Inp_Name}
     ATOM_TYPING_SCHEME    12
     INPUTS    ${Ligand_name},
     OUTPUTS    Linear_Soergel_Cluster_OUT,
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS    Linear_Soergel_Cluster_OUT,
     STRUCTOUT    Linear_Soergel_Cluster_OUT
 Cluster
-   Ligand_name="Linear_Soergel_Cluster_OUT"
 }
 Radial_Soergel(){
 cat<<Cluster >> ${Inp_Name}
@@ -2311,11 +2300,10 @@ cat<<Cluster >> ${Inp_Name}
     ATOM_TYPING_SCHEME    12
     INPUTS    ${Ligand_name},
     OUTPUTS    Radial_Soergel_Cluster_OUT,
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS    Radial_Soergel_Cluster_OUT,
     STRUCTOUT    Radial_Soergel_Cluster_OUT
 Cluster
-   Ligand_name="Radial_Soergel_Cluster_OUT"
 }
 MolPrint2D_Soergel(){
 cat<<Cluster >> ${Inp_Name}
@@ -2325,11 +2313,10 @@ cat<<Cluster >> ${Inp_Name}
     ATOM_TYPING_SCHEME    12
     INPUTS    ${Ligand_name},
     OUTPUTS    MolPrint2D_Soergel_Cluster_OUT,
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS    MolPrint2D_Soergel_Cluster_OUT,
     STRUCTOUT    MolPrint2D_Soergel_Cluster_OUT
 Cluster
-   Ligand_name="MolPrint2D_Soergel_Cluster_OUT"
 }
 Topo_Soergel(){
 cat<<Cluster >> ${Inp_Name}
@@ -2339,11 +2326,10 @@ cat<<Cluster >> ${Inp_Name}
     ATOM_TYPING_SCHEME    12
     INPUTS    ${Ligand_name},
     OUTPUTS    Topo_Soergel_Cluster_OUT,
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS    Topo_Soergel_Cluster_OUT,
     STRUCTOUT    Topo_Soergel_Cluster_OUT
 Cluster
-   Ligand_name="Topo_Soergel_Cluster_OUT"
 }
 Dendritic_Soergel(){
 cat<<Cluster >> ${Inp_Name}
@@ -2353,11 +2339,10 @@ cat<<Cluster >> ${Inp_Name}
     ATOM_TYPING_SCHEME    12
     INPUTS    ${Ligand_name},
     OUTPUTS    Dendritic_Soergel_Cluster_OUT,
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS    Dendritic_Soergel_Cluster_OUT,
     STRUCTOUT    Dendritic_Soergel_Cluster_OUT
 Cluster
-   Ligand_name="Dendritic_Soergel_Cluster_OUT"
 }
 
 IFT(){
@@ -2402,7 +2387,7 @@ cat<<IFT >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   SP_OUT,
     STRUCTOUT   SP_OUT
 [STAGE:PULL_IFT]
@@ -2423,7 +2408,7 @@ cat<<IFT >> ${Inp_Name}
     NUMBER_OF_PASSES    1
     MINIM_NITER 5
     MINIM_RMSG  0.01
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   INDUCE_FIT_OUT,
     STRUCTOUT   INDUCE_FIT_OUT
 IFT
@@ -2449,7 +2434,7 @@ cat<<MMGBSA_EN >> ${Inp_Name}
     OUTPUT_LIG_STRAING  True
     OPLS_VERSION    ${Force_Field}
     USE_MAE_CHARGES True
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   MMGBSA_EN_OUT,
     STRUCTOUT   MMGBSA_EN_OUT
 MMGBSA_EN
@@ -2480,7 +2465,7 @@ cat<<MMGBSA_MIN >> ${Inp_Name}
     NUMBER_OF_PASSES    2
     MINIM_NITER 2
     MINIM_RMSG  0.01
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   MMGBSA_MIN_OUT,
     STRUCTOUT   MMGBSA_MIN_OUT
 [STAGE:MMGBSA_EN]
@@ -2492,7 +2477,7 @@ cat<<MMGBSA_MIN >> ${Inp_Name}
     OUTPUT_LIG_STRAING  True
     OPLS_VERSION    ${Force_Field}
     USE_MAE_CHARGES True
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   MMGBSA_MIN_OUT,
     STRUCTOUT   MMGBSA_MIN_OUT
 MMGBSA_MIN
@@ -2522,7 +2507,7 @@ cat<<MMGBSA_OPT >> ${Inp_Name}
     FLEXDIST    5.0
     NUMBER_OF_PASSES    2
     NITER_SIDE  8
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   MMGBSA_OPT_OUT,
     STRUCTOUT   MMGBSA_OPT_OUT
 [STAGE:MMGBSA_EN]
@@ -2534,7 +2519,7 @@ cat<<MMGBSA_OPT >> ${Inp_Name}
     OUTPUT_LIG_STRAING  True
     USE_MAE_CHARGES True
     OPLS_VERSION    ${Force_Field}
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   MMGBSA_MIN_OUT,
     STRUCTOUT   MMGBSA_MIN_OUT
 MMGBSA_OPT
@@ -2568,7 +2553,7 @@ cat<<QMMM >> ${Inp_Name}
     QM_DFTNAME  ${DFTname}
     QM_BASIS    ${Basisname}
     MM_FORCEFIELD   ${Force_Field}
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   QMMM_OUT,
     STRUCTOUT   QMMM_OUT
 QMMM
@@ -2632,7 +2617,7 @@ cat<<QMMM >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   QMSP_OUT,
     STRUCTOUT   QMSP_OUT
 QMMM
@@ -2658,8 +2643,8 @@ cat<<CDD >> ${Inp_Name}
     INPUTS   ${Ligand_name},
     OUTPUTS     COV_COMPLEX_OUT,
     RECEP_STAYING_ATOM  ${ATTACHMENT_ATOM}
-    SMARTS  [C,c]=[C,c]-[C,c,S,s]=[O]  [C,c]=[O,S]  [B]([O])[O]  [C;r3][O;r3][C;r3]  [S;X2;H1]  [C]#[N]  [O-0X1]=[C]1[C][C][N]1  NC(=O)C(=O)C(C)N   [C,c]=[C,c]-[C,c]#[N,n]  [C-0X2]#[C-0X2][C-0X3]=[O-0X1]  [C][S][S][H]  [N]=[O,S]  [N]=[C]=[S]  [C;H1]([Cl])-[C](=[O])  [C]=[C][c][n]
-    POSITIONS   1  1  1  1  1  1  2  4  1  1  2  1  2  1  1
+    SMARTS  [C,c]=[C,c]-[C,c,S,s]=[O], [C,c]=[O,S], [B]([O])[O], [C;r3][O;r3][C;r3], [S;X2;H1], [C]#[N], [O-0X1]=[C]1[C][C][N]1, NC(=O)C(=O)C(C)N, [C,c]=[C,c]-[C,c]#[N,n], [C-0X2]#[C-0X2][C-0X3]=[O-0X1], [C][S][S][H], [N]=[O,S], [N]=[C]=[S], [C;H1]([Cl])-[C](=[O]), [C]=[C][c][n]
+    POSITIONS   1, 1, 1, 1, 1, 1, 2, 4, 1, 1, 2, 1, 2, 1, 1
 [STAGE:INDUCE_FIT]
     STAGECLASS  prime.PrimeStage
     INPUTS  COV_COMPLEX_OUT
@@ -2672,7 +2657,7 @@ cat<<CDD >> ${Inp_Name}
     NUMBER_OF_PASSES    3
     MINIM_NITER 6
     MINIM_RMSG  0.01
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   COV_REFINE_OUT,
     STRUCTOUT   COV_REFINE_OUT
 CDD
@@ -2683,8 +2668,8 @@ cat<<CDD >> ${Inp_Name}
     INPUTS   ${Ligand_name},
     OUTPUTS     COV_COMPLEX_OUT,
     RECEP_STAYING_ATOM  ${ATTACHMENT_ATOM}
-    SMARTS  [C]=[C]-[S](=O)(=O)  [C](=[O])-[C] >= 1
-    POSITIONS   1  1
+    SMARTS  [C]=[C]-[S](=O)(=O), [C](=[O])-[C]
+    POSITIONS   1, 1
 [STAGE:INDUCE_FIT]
     STAGECLASS  prime.PrimeStage
     INPUTS  COV_COMPLEX_OUT
@@ -2697,7 +2682,7 @@ cat<<CDD >> ${Inp_Name}
     NUMBER_OF_PASSES    3
     MINIM_NITER 6
     MINIM_RMSG  0.01
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   COV_REFINE_OUT,
     STRUCTOUT   COV_REFINE_OUT
 CDD
@@ -2714,7 +2699,7 @@ cat<<RMSD >>${Inp_Name}
     INPUT   ${TO_RMSD},${Ligand_name}
     OUTPUTS RMSD_OUT
     UNIQUEFIELD  s_m_title
-[USEROUTS]
+[USEROUTS:$task]
     USEROUTS   RMSD_OUT,
     STRUCTOUT   RMSD_OUT
 RMSD
@@ -2722,7 +2707,6 @@ RMSD
 }
 
 generate_INP(){
-    Parse_Running_Mode $Running_Mode
     Pipeline_array=(${Pipeline//+/ })
     echo "########## Virtual Screening Workflow Input File ###############" > ${Inp_Name}
     setGrid
@@ -2738,14 +2722,15 @@ generate_INP(){
 
 Params_check_and_report && for INPUT in `ls $input`
 do
+    Parse_Running_Mode $Running_Mode
     if [ -z $Job_Title ]; then
         Job_Title="${Database}-${INPUT%%.zip*}-${Running_Mode}"
     fi
     mkdir ${Job_Title}
-    Inp_Name="${PWD}/${Job_Title}/${Job_Title}.inp"
-    generate_INP #accept $Inp_Name
+    Inp_Name="${Job_Title}.inp"
     cd ${Job_Title}
-    $SCHRODINGER/run pipeline_startup.py -OVERWRITE -adjust -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -JOBNAME ${Job_Title} -host_glide "${HOST}:${Glide}" -host_ligprep "${HOST}:${LigPrep}" -host_phase "${HOST}:${Phase}" -host_prime "${HOST}:${Prime}" -host_mmod "${HOST}:${MACROMODEL}" -host_qsite "${HOST}:${Qsite}" -host_qikprop "${HOST}:${QIKPROP}" ${Inp_Name}
+    generate_INP #accept $Inp_Name
+    $SCHRODINGER/run pipeline_startup.py -OVERWRITE -adjust -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -REMOTEDRIVER -JOBNAME ${Job_Title} -host_glide "${HOST}:${Glide}" -host_ligprep "${HOST}:${LigPrep}" -host_phase "${HOST}:${Phase}" -host_prime "${HOST}:${Prime}" -host_mmod "${HOST}:${MACROMODEL}" -host_qsite "${HOST}:${Qsite}" -host_qikprop "${HOST}:${QIKPROP}" -TMPLAUNCHDIR ${Inp_Name} 
     cd ..
 done
 
