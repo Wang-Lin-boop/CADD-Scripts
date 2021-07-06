@@ -199,6 +199,7 @@ Control parameters:
   -q    Define a "DFT:Basis_Set" to QM/QMMM, default is "B3LYP-D3(BJ):6-311G**".
             Other QM setting: "B3LYP-D3M(BJ):6-311G+**","M06‑2X:def2-tzvpp(-g)","wB97M‑V:cc-pVTZ-pp"
   -p    PH for ligPrep, with ±2.0. <7.0>
+  -s    Set a SMARTs Expression for compounds filter at first step. such as [B]([O])[O].
 
 OUTPUT parameters:
   -a    The number of Output compounds per Screening Task. <5%>
@@ -234,17 +235,17 @@ do
         options
         exit;;
     i)
-        input=$OPTARG;;
+        input=`readlink -f $OPTARG`;;
     D)
         Database=$OPTARG;;
     d)
-        User_dbPath=$OPTARG;;
+        User_dbPath=`readlink -f $OPTARG`;;
     m)
         Running_Mode=$OPTARG;;
     T)
         Job_Title=$OPTARG;;
     R)
-        Reference_Ligand=$OPTARG;;
+        Reference_Ligand=`readlink -f $OPTARG`;;
     a)
         HTVS_out_num=$OPTARG;;
     e)
@@ -255,6 +256,8 @@ do
         Dock_out_num=$OPTARG;;
     p)
         PH=$OPTARG;;
+    s)
+        SMARTs=$OPTARG;;
     q)
         QM_set=$OPTARG;;
     c)
@@ -369,7 +372,7 @@ fi
 cat<<OUTPUTLOG
 Virtual Screening Workflow Parameter:
 Job Dir: ${Work_Dir}
-Input Files: ${input}
+Grid Files: ${input}
 Database: ${Database_Location}
 Running Mode: ${Running_Mode}
 ${Reference_Ligand_notice}
@@ -381,7 +384,7 @@ setGrid(){
 cat<<GRID >> ${Inp_Name}
 [SET:GRID]
     VARCLASS   Grid
-    FILE    "${Work_Dir}/${INPUT}"
+    FILE    "${INPUT}"
 GRID
 }
 
@@ -418,6 +421,17 @@ SETDB
     fi
     Ligand_name="INPUT_Ligands"
     TO_RMSD="INPUT_Ligands"
+}
+
+SMARTs(){
+cat<<Warhead >> ${Inp_Name}
+[STAGE:SMARTs]
+    STAGECLASS   filtering.LigFilterStage
+    INPUTS   ${Ligand_name},
+    OUTPUTS   SMARTs_OUT,
+    CONDITIONS   "${SMARTs} >= 1"
+Warhead
+    Ligand_name="SMARTs_OUT"
 }
 
 QIKPROP(){
@@ -1261,7 +1275,7 @@ cat<<HTVS >> ${Inp_Name}
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
     USE_REF_LIGAND  YES
-    REF_LIGAND_FILE ${Work_Dir}/${Reference_Ligand}
+    REF_LIGAND_FILE ${Reference_Ligand}
     CORE_DEFINITION mcssmarts
     CORE_RESTRAIN   YES
     CORE_SNAP   YES
@@ -1573,7 +1587,7 @@ cat<<SP >> ${Inp_Name}
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
     USE_REF_LIGAND  YES
-    REF_LIGAND_FILE ${Work_Dir}/${Reference_Ligand}
+    REF_LIGAND_FILE ${Reference_Ligand}
     CORE_DEFINITION mcssmarts
     CORE_RESTRAIN   YES
     CORE_SNAP   YES
@@ -1923,7 +1937,7 @@ cat<<XP >> ${Inp_Name}
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
     USE_REF_LIGAND  YES
-    REF_LIGAND_FILE ${Work_Dir}/${Reference_Ligand}
+    REF_LIGAND_FILE ${Reference_Ligand}
     CORE_DEFINITION mcssmarts
     CORE_RESTRAIN   YES
     CORE_SNAP   YES
@@ -2087,6 +2101,7 @@ XP
 Linear_Tanimoto(){
 cat<<Cluster >> ${Inp_Name}
 [STAGE:Linear_Tanimoto]
+    STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Linear
     SIMILARITY_METRIC    Tanimoto
     ATOM_TYPING_SCHEME    12
@@ -2100,6 +2115,7 @@ Cluster
 Radial_Tanimoto(){
 cat<<Cluster >> ${Inp_Name}
 [STAGE:Radial_Tanimoto]
+    STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Radial
     SIMILARITY_METRIC    Tanimoto
     ATOM_TYPING_SCHEME    12
@@ -2113,6 +2129,7 @@ Cluster
 MolPrint2D_Tanimoto(){
 cat<<Cluster >> ${Inp_Name}
 [STAGE:MolPrint2D_Tanimoto]
+    STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    MolPrint2D
     SIMILARITY_METRIC    Tanimoto
     ATOM_TYPING_SCHEME    12
@@ -2126,6 +2143,7 @@ Cluster
 Topo_Tanimoto(){
 cat<<Cluster >> ${Inp_Name}
 [STAGE:Topo_Tanimoto]
+    STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Topo
     SIMILARITY_METRIC    Tanimoto
     ATOM_TYPING_SCHEME    12
@@ -2139,6 +2157,7 @@ Cluster
 Dendritic_Tanimoto(){
 cat<<Cluster >> ${Inp_Name}
 [STAGE:Dendritic_Tanimoto]
+    STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Dendritic
     SIMILARITY_METRIC    Tanimoto
     ATOM_TYPING_SCHEME    12
@@ -2152,6 +2171,7 @@ Cluster
 Linear_Euclidean(){
 cat<<Cluster >> ${Inp_Name}
 [STAGE:Linear_Euclidean]
+    STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Linear
     SIMILARITY_METRIC    Euclidean
     ATOM_TYPING_SCHEME    12
@@ -2165,6 +2185,7 @@ Cluster
 Radial_Euclidean(){
 cat<<Cluster >> ${Inp_Name}
 [STAGE:Radial_Euclidean]
+    STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Radial
     SIMILARITY_METRIC    Euclidean
     ATOM_TYPING_SCHEME    12
@@ -2178,6 +2199,7 @@ Cluster
 MolPrint2D_Euclidean(){
 cat<<Cluster >> ${Inp_Name}
 [STAGE:MolPrint2D_Euclidean]
+    STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    MolPrint2D
     SIMILARITY_METRIC    Euclidean
     ATOM_TYPING_SCHEME    12
@@ -2191,6 +2213,7 @@ Cluster
 Topo_Euclidean(){
 cat<<Cluster >> ${Inp_Name}
 [STAGE:Topo_Euclidean]
+    STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Topo
     SIMILARITY_METRIC    Euclidean
     ATOM_TYPING_SCHEME    12
@@ -2204,6 +2227,7 @@ Cluster
 Dendritic_Euclidean(){
 cat<<Cluster >> ${Inp_Name}
 [STAGE:Dendritic_Euclidean]
+    STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Dendritic
     SIMILARITY_METRIC    Euclidean
     ATOM_TYPING_SCHEME    12
@@ -2217,6 +2241,7 @@ Cluster
 Linear_Cosine(){
 cat<<Cluster >> ${Inp_Name}
 [STAGE:Linear_Cosine]
+    STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Linear
     SIMILARITY_METRIC    Cosine
     ATOM_TYPING_SCHEME    12
@@ -2230,6 +2255,7 @@ Cluster
 Radial_Cosine(){
 cat<<Cluster >> ${Inp_Name}
 [STAGE:Radial_Cosine]
+    STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Radial
     SIMILARITY_METRIC    Cosine
     ATOM_TYPING_SCHEME    12
@@ -2243,6 +2269,7 @@ Cluster
 MolPrint2D_Cosine(){
 cat<<Cluster >> ${Inp_Name}
 [STAGE:MolPrint2D_Cosine]
+    STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    MolPrint2D
     SIMILARITY_METRIC    Cosine
     ATOM_TYPING_SCHEME    12
@@ -2256,6 +2283,7 @@ Cluster
 Topo_Cosine(){
 cat<<Cluster >> ${Inp_Name}
 [STAGE:Topo_Cosine]
+    STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Topo
     SIMILARITY_METRIC    Cosine
     ATOM_TYPING_SCHEME    12
@@ -2269,6 +2297,7 @@ Cluster
 Dendritic_Cosine(){
 cat<<Cluster >> ${Inp_Name}
 [STAGE:Dendritic_Cosine]
+    STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Dendritic
     SIMILARITY_METRIC    Cosine
     ATOM_TYPING_SCHEME    12
@@ -2282,6 +2311,7 @@ Cluster
 Linear_Soergel(){
 cat<<Cluster >> ${Inp_Name}
 [STAGE:Linear_Soergel]
+    STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Linear
     SIMILARITY_METRIC    Soergel
     ATOM_TYPING_SCHEME    12
@@ -2295,6 +2325,7 @@ Cluster
 Radial_Soergel(){
 cat<<Cluster >> ${Inp_Name}
 [STAGE:Radial_Soergel]
+    STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Radial
     SIMILARITY_METRIC    Soergel
     ATOM_TYPING_SCHEME    12
@@ -2308,6 +2339,7 @@ Cluster
 MolPrint2D_Soergel(){
 cat<<Cluster >> ${Inp_Name}
 [STAGE:MolPrint2D_Soergel]
+    STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    MolPrint2D
     SIMILARITY_METRIC    Soergel
     ATOM_TYPING_SCHEME    12
@@ -2321,6 +2353,7 @@ Cluster
 Topo_Soergel(){
 cat<<Cluster >> ${Inp_Name}
 [STAGE:Topo_Soergel]
+    STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Topo
     SIMILARITY_METRIC    Soergel
     ATOM_TYPING_SCHEME    12
@@ -2334,6 +2367,7 @@ Cluster
 Dendritic_Soergel(){
 cat<<Cluster >> ${Inp_Name}
 [STAGE:Dendritic_Soergel]
+    STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Dendritic
     SIMILARITY_METRIC    Soergel
     ATOM_TYPING_SCHEME    12
@@ -2711,8 +2745,8 @@ generate_INP(){
     echo "########## Virtual Screening Workflow Input File ###############" > ${Inp_Name}
     setGrid
     setdatabase
-    if [ ${Reference_Ligand} ];then
-        setREF
+    if [ ${SMARTs} ];then
+        SMARTs
     fi
     for task in ${Pipeline_array[@]};do
         $task 
@@ -2730,7 +2764,8 @@ do
     Inp_Name="${Job_Title}.inp"
     cd ${Job_Title}
     generate_INP #accept $Inp_Name
-    $SCHRODINGER/run pipeline_startup.py -OVERWRITE -adjust -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -REMOTEDRIVER -JOBNAME ${Job_Title} -host_glide "${HOST}:${Glide}" -host_ligprep "${HOST}:${LigPrep}" -host_phase "${HOST}:${Phase}" -host_prime "${HOST}:${Prime}" -host_mmod "${HOST}:${MACROMODEL}" -host_qsite "${HOST}:${Qsite}" -host_qikprop "${HOST}:${QIKPROP}" -TMPLAUNCHDIR ${Inp_Name} 
+    $SCHRODINGER/vsw ${Inp_Name} -OVERWRITE -adjust -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -REMOTEDRIVER -JOBNAME ${Job_Title} -host_glide "${HOST}:${Glide}" -host_ligprep "${HOST}:${LigPrep}" -host_phase "${HOST}:${Phase}" -host_prime "${HOST}:${Prime}" -host_mmod "${HOST}:${MACROMODEL}" -host_qsite "${HOST}:${Qsite}" -host_qikprop "${HOST}:${QIKPROP}" -TMPLAUNCHDIR
     cd ..
 done
+
 
