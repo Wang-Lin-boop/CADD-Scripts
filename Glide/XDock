@@ -9,7 +9,7 @@
     Rosetta_Jd2_or_Schrodinger=Schrodinger
     
     # Job Control
-    Mode="Normal"
+    Mode="SITEMAP"
 
     By_Center=false
     By_Complex=true
@@ -28,6 +28,8 @@
     Ligand_ASL="A:999"
     Force_Field="OPLS_2005"
     Distance=5.0
+    SAMPLING=1
+    MAXKEEP=5000
 
     Mode_List=("Normal" "Grid" "COMPD" "COMPI" "SITEMAP" "GCD" "GCI")
     VAILD_PRECISION=("SP" "XP" "HTVS")
@@ -70,19 +72,18 @@ XDock control parameter:
             The ligands will be processed using Schrödinger's LigPrep module.
   -p    Protein need to be prepared, default is true, use "-p false" to close it. <true>
   -j    Prepare the proteins by Rosetta_Jd2 fastly. If not, using Schrödinger to finely prepare the proteins.
-  -m    XDock Mode: <Normal>
-            Normal: Ligand position of protein-ligand complex + protein pocket identifed by SiteMap, SP Docking.
+  -m    XDock Mode: <SITEMAP>
+            SITEMAP: Only protein pocket identifed by SiteMap, SP Docking.
                 Change the number of Grid files per protein generated using Sitemap by "-s <num>", default is 2.
             Grid: Ligand position of protein-ligand complex + protein pocket identifed by SiteMap, Grid Generation Only.
                 Change the number of Grid files per protein generated using Sitemap by "-s <num>", default is 2.
             COMPD: Ligand position of protein-ligand complex, SP Docking.
             COMPI: Ligand position of protein-ligand complex, Induce Fit Docking.
-            SITEMAP: Only protein pocket identifed by SiteMap, SP Docking.
-                Change the number of Grid files per protein generated using Sitemap by "-s <num>", default is 2.
             GCD: User Defined Grid center, SP Docking.
                 Define pocket by Provided Grid center Coordinate, e.g. "-g 153.00, 65.023, 24.003".
             GCI: User Defined Grid center, Induce Fit Docking.
                 Define pocket by Provided Grid center Coordinate, e.g. "-g 153.00, 65.023, 24.003".
+            Native: re-dock the ligand in input complex.
 
   -g    Only the grid center Coordinate will be considered.
             Define a grid center Coordinate to docking, additionally. Such as "153.00, 65.023, 24.003".
@@ -94,6 +95,7 @@ XDock control parameter:
   -A    Reference Ligand ASL to induce Fit Docking. Such as: "A:999"
   -D    residues within the specified distance will be set to flexible in Induce Fit Docking. default is 5.0 Å.
   -F    Force Field in Induce Fit Docking, OPLS_2005, OPLS3e or OPLS4.
+  -e    Enchanced Sampling.
 
 Job control:
   -H	Hostname of your queue, defult is HPC_CPU.
@@ -107,7 +109,7 @@ Thank you for your using, If you found any problem, Please contact wanglin3@shan
 HELP
 }
 
-while getopts ":hP:L:l:p:jH:N:S:g:s:m:n:o:x:A:F:D:r:R:B:" opt
+while getopts ":hP:L:l:p:jH:N:S:g:s:m:n:o:x:A:F:D:r:R:B:e" opt
 do
   case $opt in
     h)
@@ -120,9 +122,9 @@ do
     S)
         SCHRODINGER=$OPTARG;;
     P)
-        Protein_Input=$OPTARG;;
+        Protein_Input=`readlink -f $OPTARG`;;
     L)
-        Ligand_Input=$OPTARG;;
+        Ligand_Input=`readlink -f $OPTARG`;;
     l)
         ligPrep=$OPTARG;;
     p)
@@ -150,6 +152,9 @@ do
         Force_Field=$OPTARG;;
     D)
         Distance=$OPTARG;;
+    e)
+        SAMPLING=3
+        MAXKEEP=15000;;
     ?)
         echo ""
         echo "Error: Do not use undefined options."
@@ -216,9 +221,9 @@ fi
 
 if [ $ProPrep == "true" ];then
     if [ $Rosetta_Jd2_or_Schrodinger == "Rosetta_Jd2" ];then
-        mkdir ${Protein_Input}-OUT
+        mkdir $(basename ${Protein_Input})-OUT
         ls $Protein_Input | parallel -j $Njobs $rosetta_app/score_jd2.static.linuxgccrelease -database $rosetta_db -in:file:s ${Protein_Input}/{} -out:file:scorefile ${Protein_Input}_jd2.sc -out:path:pdb ${Protein_Input}-OUT -score:weights ref2015_cart -out:pdb -ex1 -ex2aro -ignore_zero_occupancy false -in:ignore_unrecognized_res true
-        Protein_to_DOCK=${Protein_Input}-OUT
+        Protein_to_DOCK=`readlink -f ${Protein_Input}-OUT`
         PPREP="FALSE"
     elif [ $Rosetta_Jd2_or_Schrodinger == "Schrodinger" ];then
         PPREP="TRUE"
@@ -228,7 +233,7 @@ if [ $ProPrep == "true" ];then
         exit
     fi
 elif [ $ProPrep == "false" ];then
-    Protein_to_DOCK=${Protein_Input}
+    Protein_to_DOCK=`readlink -f ${Protein_Input}`
     PPREP="FALSE"
 else
     echo "Your Option of Protein Preparation: -p ${ProPrep} is Invalid."
@@ -285,57 +290,68 @@ elif [ $Mode == "GCI" ];then
     Xglide=false
     Docking=false
     Induce_Fit=true
+elif [ $Mode == "Native" ];then
+    Native=true
+    Xglide=false
+    Induce_Fit=false
 else
     echo "Unkown Error, Please contact wanglin3@shanghaitech.edu.cn."
     exit
 fi
 
+mkdir ${Mode}
+Job_Dir=${PWD}
+cd ${Mode}
+
 # Xglide Module
 if [ $Xglide == "true" ];then
 
-cat<<INP0 > Xglide.inp
-#Job Dic.: ${PWD}
+cat<<INP0 > Xglide-${Mode}.inp
+#Job Dic.: ${Job_Dir}
 #Protein Lib: ${Protein_to_DOCK}
 #Ligand Input: ${Ligand_Input}
 INP0
 
 if [ $By_Complex == "true" ];then
-    echo "COMPLEX       ${Protein_to_DOCK}" >> Xglide.inp
+    echo "COMPLEX       ${Protein_to_DOCK}" >> Xglide-${Mode}.inp
 fi
 
 if [ $By_SiteMap == "true" ];then
-    echo "RECEPTOR       ${Protein_to_DOCK}" >> Xglide.inp
-    echo "SITEMAP       TRUE" >> Xglide.inp
-    echo "SITEMAP_MAXSITES      ${Site_Num}" >> Xglide.inp
-    echo "GRIDGEN_GRID_CENTER      SELF" >> Xglide.inp
-    echo "SITEMAP_FORCE       TRUE" >> Xglide.inp
+    echo "RECEPTOR       ${Protein_to_DOCK}" >> Xglide-${Mode}.inp
+    echo "SITEMAP       TRUE" >> Xglide-${Mode}.inp
+    echo "SITEMAP_MAXSITES      ${Site_Num}" >> Xglide-${Mode}.inp
+    echo "GRIDGEN_GRID_CENTER      SELF" >> Xglide-${Mode}.inp
+    echo "SITEMAP_FORCE       TRUE" >> Xglide-${Mode}.inp
+    echo "GRIDGEN_OUTERBOX       SELF" >> Xglide-${Mode}.inp
 fi
 
 if [ $By_Center == "true" ];then
-    echo "RECEPTOR       ${Protein_to_DOCK}" >> Xglide.inp
-    echo "SITEMAP       FALSE" >> Xglide.inp
-    echo "GRIDGEN_GRID_CENTER      ${Grid_Center}" >> Xglide.inp
+    echo "RECEPTOR       ${Protein_to_DOCK}" >> Xglide-${Mode}.inp
+    echo "SITEMAP       FALSE" >> Xglide-${Mode}.inp
+    echo "GRIDGEN_GRID_CENTER      ${Grid_Center}" >> Xglide-${Mode}.inp
 fi
 
-cat<<INP1 >> Xglide.inp
+cat<<INP1 >> Xglide-${Mode}.inp
 PPREP       ${PPREP}
 PPREP_WATERDIST     3.0
 LIGAND      ${Ligand_Input}
 MAXLIGATOMS     300
 LIGPREP     ${LIGPREP}
-GRIDGEN_INNERBOX        12
-GRIDGEN_OUTERBOX_BUFFER     15
+GRIDGEN_INNERBOX        15
+GRIDGEN_OUTERBOX_BUFFER     20
 INP1
 
 if [ $Docking == "true" ];then
-cat<<INP2 >> Xglide.inp
+cat<<INP2 >> Xglide-${Mode}.inp
 DOCK_PRECISION      ${PRECISION}
 DOCK_POSES_PER_LIG      ${Pose_Num}
 DOCK_POSE_OUTTYPE       poseviewer
 GENERATE_TOP_COMPLEXES      ${OUT_com}
+DOCK_NENHANCED_SAMPLING     ${SAMPLING}
+DOCK_MAXKEEP    ${MAXKEEP}
 INP2
 elif [ $Docking == "false"];then
-    echo "SKIP_DOCKING      TRUE" >> Xglide.inp
+    echo "SKIP_DOCKING      TRUE" >> Xglide-${Mode}.inp
 else
     echo "Unkown Error, Please contact wanglin3@shanghaitech.edu.cn."
     exit
@@ -344,12 +360,13 @@ fi
 echo "Submitting Flexible Docking Jobs......"
 echo ""
 
-${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -OVERWRITE Xglide.inp
+${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -TMPLAUNCHDIR -OVERWRITE Xglide-${Mode}.inp
 
 fi # Xglide Module
 
 # Induce Fit Module
 if [ "$Induce_Fit"x == "true"x ];then
+
     for i in `ls ${Protein_to_DOCK}`;do
     $SCHRODINGER/utilities/structcat -i ${Protein_to_DOCK}/${i} -o Proteins_to_InduceFitDock.maegz ; done
     for i in `ls $Ligand_Input`;do
@@ -361,17 +378,17 @@ if [ "$Induce_Fit"x == "true"x ];then
     else
         echo "Induce Fit Docking cannot to using SiteMap."
     fi 
-cat<<IFT1 > IFT.inp
+cat<<IFT1 > IFT-${Mode}.inp
 INPUT_FILE  Proteins_to_InduceFitDock.maegz
 IFT1
 
 if [ $ProPrep == "true" ];then
     echo "STAGE PPREP
     RMSD    0.5
-    " >>  IFT.inp
+    " >>  IFT-${Mode}.inp
 fi
 
-cat<<IFT2 >> IFT.inp
+cat<<IFT2 >> IFT-${Mode}.inp
 STAGE VDW_SCALING
   BINDING_SITE ${BINDING_SITE}
 
@@ -428,8 +445,32 @@ IFT2
 echo "Submitting Induce Fit Docking Jobs......"
 echo ""
 
-    ${SCHRODINGER}/ifd -NGLIDECPU ${Njobs} -NPRIMECPU ${Prime} IFT.inp -NOLOCAL -HOST ${HOST} -SUBHOST ${HOST}
+    ${SCHRODINGER}/ifd -NGLIDECPU ${Njobs} -NPRIMECPU ${Prime} IFT-${Mode}.inp -NOLOCAL -HOST ${HOST} -SUBHOST ${HOST} -TMPLAUNCHDIR
+
 
 fi # Induce Fit Module
 
+if [ "$Native"x == "true"x ];then
 
+cat<<INP0 > Redock-${Mode}.inp
+#Job Dic.: ${Job_Dir}
+#Protein Lib: ${Protein_to_DOCK}
+COMPLEX         ${Protein_to_DOCK}
+DOCK_PRECISION       ${PRECISION}
+GRIDGEN_GRID_CENTER  SELF
+NATIVEONLY           TRUE
+DOCK_POSES_PER_LIG      ${Pose_Num}
+DOCK_NENHANCED_SAMPLING ${SAMPLING}
+DOCK_POSE_OUTTYPE       poseviewer
+INP0
+
+echo "Submitting Native re-docking Jobs......"
+echo ""
+
+${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -TMPLAUNCHDIR -OVERWRITE Redock-${Mode}.inp
+
+fi # Native redock
+
+
+cd ..
+echo "Job $Mode has been submitted!"
