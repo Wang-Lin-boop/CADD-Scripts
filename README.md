@@ -91,4 +91,11 @@ A linux shell script to run MD job from a mae file by Desmond.
               -G    GPU Host you wanna to use, default is  HPC_GPU.
               -D	Your Desmond path. <$Desmond>     
 
+plmd
+====
+
+
+GVSrun
+=====
+
 #后排插播一条广告，欢迎加入Schrödinger中文社区，请致信wanglin3@shanghaitech.edu.cn获取加群二维码。
