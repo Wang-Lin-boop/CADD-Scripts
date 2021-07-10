@@ -94,8 +94,129 @@ A linux shell script to run MD job from a mae file by Desmond.
 plmd
 ====
 
+                        Usage: plmd [OPTION] <parameter>
+
+                        An automatic Desmond MD pipline for protein-ligand complex MD simulation.
+
+                        Example: 
+                        1) plmd -i "*.mae" -S INC -P "chain.name A" -L "res.ptype UNK" -H HPC_CPU -G HPC_GPU
+                        2) plmd -i "*.mae" -S OUC -P "chain.name A" -L "chain.name B" -t 200 -H HPC_CPU -G HPC_gpu01
+                        3) plmd -i "*.mae" -S "TIP4P:Cl:0.15-Na-Cl+0.02-Fe2-Cl+0.02-Mg2-Cl" -L "res.num 999" -G HPC_gpu03
+                        4) plmd -i "*.cms" -P "chain.name A" -L "res.ptype ADP" -H HPC_CPU -G HPC_gpu04
+
+                        Input parameter:
+                          -i	Use a file name (Multiple files are wrapped in "", and split by ' ') *.mae or *.cms ;
+                                    or regular expression to represent your input file, default is *.mae.
+
+                        System Builder parameter:
+                          -S    System Build Mode: <INC>
+                                    INC: System in cell, salt buffer is 0.15M KCl, water is TIP3P. Add K to neutralize system.
+                                    OUC: System out of cell, salt buffer is 0.15M NaCl, water is TIP3P. Add Na to neutralize system.
+                                    Custom Instruct: Such as: "TIP4P:Cl:0.15-Na-Cl+0.02-Fe2-Cl+0.02-Mg2-Cl"
+                                        Interactive addition of salt. Add Cl to neutralize system.
+                                            for positive_ion: Na, Li, K, Rb, Cs, Fe2, Fe3, Mg2, Ca2, Zn2 are predefined.
+                                            for nagative_ion: F, Cl, Br, I are predefined.
+                                            for water: SPC, TIP3P, TIP4P, TIP5P, DMSO, METHANOL are predefined.
+
+                          -b	Define a boxshape for your systems. <cubic>
+                                    box types: dodecahedron_hexagon, cubic, orthorhombic, triclinic
+                          -s	Define a boxsize for your systems.  <15.0>
+                                                for dodecahedron_hexagon and cubic, defulat is 15.0;
+                                                for orthorhombic or triclinic box, defulat is [15.0 15.0 15.0];
+                                                If you want use Orthorhombic or Triclinic box, your parameter should be like "15.0 15.0 15.0"
+                          -R    Redistribute the mass of heavy atoms to bonded hydrogen atoms to slow-down high frequency motions.
+                          -F	Define a force field to build your systems. <OPLS_2005>
+                                                OPLS_2005, S-OPLS, OPLS3e, OPLS3, OPLS2 are recommended to protein-ligand systems.
+
+                        Simulation control parameter:
+                          -m	Enter the maximum simulation time for the Brownian motion simulation, in ps. <100>
+                          -t    Enter the Molecular dynamics simulation time for the product simulation, in ns. <100>
+                          -T    Specify the temperature to be used, in kelvin. <310>
+                          -N    Number of Repeat simulation with different random numbers. <1>
+                          -P    Define a ASL to protein, such as "protein".
+                          -L    Define a ASL to ligand, such as "res.ptype UNK".
+                          -q    Turn off protein-ligand analysis.
+                          -u    Turn off md simulation, only system build.
+                          -C    Set constraint to an ASL, such as "chain.name A AND backbone"
+                          -f    Set constraint force, default is 10.
+                          -o    Specify the approximate number of frames in the trajectory.  <1000>
+                                This value is coupled with the recording interval for the trajectory and the simulation time: the number of frames times the trajectory recording interval is the total simulation time.
+                                If you adjust the number of frames, the recording interval will be modified.
+
+                        Job control:
+                          -G	HOST of GPU queue, default is HPC_GPU.
+                          -H    HOST of CPU queue, default is HPC_CPU.
+                          -D	Your Desmond path. <$Desmond>
+
+                        Thank you for your using, If you found any question, Please contact wanglin3@shanghaitech.edu.cn.
 
 GVSrun
 =====
+A linux shell script to run Virual Screening WorkFlow for Schrodinger, a higher vesion of VSgo.
+
+
+                        Perform Virtual Screening Workflow.
+
+                        Usage: Vsgo [OPTION] <parameter>
+
+                        Example: 
+                        1) Vsgo -i "*.zip" -D DrugBank -s 10 -N 20 -H HPC_CPU
+                        2) Vsgo -i "*.zip" -D ChemBridge -M 650 -m 300 -N 30 -H HPC_CPU
+                        3) Vsgo -i "*.zip" -D Spec -r -N 10 -H HPC_CPU
+                        4) Vsgo -i "*.zip" -D ZincLead -R -N 80 -H HPC_CPU
+
+                        Input parameter:
+                          -i	Gird file input.
+                                Use a file name (Multiple files are wrapped in "", and split by ' ') or regular expression to represent your input Grid file, default is *.zip.
+                          -D    Which databases do you want to screen? The Database basic path is <$Database_Path>.
+                                    ${Database_list}are Supported.
+                          -d    Provide your own database path, the compounds files are recommended as maegz or SDF file format.
+                          -R    Optional, reference Ligands correlated with the grid or use for RMSD calculation. As *.mae or *.maegz.
+                          -m    Running Mode: a serial combination of different computing tasks.
+                                    Show all mode and task in this option using "-O".
+                            @ Available Running Mode: <Fast>
+                                Fast: Fast Virtual Screening.
+                                Normal: Filter The Drug-like compounds and dock screening.
+                                Reference: Virtual Screening with reference ligand restrain.
+                                Prep_Normal: Virtual Screening for un-prepared compounds database.
+                                Normal_MMGBSA: Virtual Screening and MMGBSA re-scoring.
+                                Cov_Screening: Virtual Screening to discover covalent durg.
+                                Induce_Fit_Screening: Induce fit screening.
+                                QM_Screening: Virtual Screening and QMMM re-docking.
+                                Local: Local docking and screening were carried out using the input ligand structure.
+                            @ or Custom Running Mode, e.g. -m "EDL+R+HTVS+CD"
+
+                        Control parameters:
+                          -F    Force Fields, OPLS_2005, OPLS3e or OPLS4.<OPLS4>
+                          -T    Set a Job Name. Default is "Grid_name-Database_name-Run_Mode".
+                          -C    Aattach residue number on receptor, required in Covalent Docking.
+                                    e.g. "cys:A:1425", the A is chain name and 145 is the atom number(Heavy atom). 
+                                    The cys is residue name for A:1425, Supported residues: cys, ser, lys.
+                          -q    Define a "DFT:Basis_Set" to QM/QMMM, default is "B3LYP-D3(BJ):6-311G**".
+                                    Other QM setting: "B3LYP-D3M(BJ):6-311G+**","M06‑2X:def2-tzvpp(-g)","wB97M‑V:cc-pVTZ-pp"
+                          -p    PH for ligPrep, with ±2.0. <7.0>
+                          -s    Set a SMARTs Expression for compounds filter at first step. such as [B]([O])[O].
+
+                        OUTPUT parameters:
+                          -a    The number of Output compounds per Screening Task. <5%>
+                                    e.g. 10% means reatin top 10% compounds.
+                                        10000 means reatin top 10000 compounds.
+                          -b    The number of Output compounds after Standard docking Task. <4000>
+                          -c    The number of conformations generated by each ligand in the docking task. <1>
+                          -e    The number of candidates to IFT/CD/MMGBSA/QMMM. <500>
+
+                        Job control:
+                          -H	Host Name of your Queue, defult is HPC_CPU.
+                          -N    The max number of subjobs. <100>
+                          -G    The number of Glide subjobs. <90>
+                          -P    The number of Prime subjobs. <10>
+                          -L    The number of LigPrep subjobs. <30>
+                          -A    The number of phase subjobs. <10>
+                          -Q    The number of Qsite subjobs. <10>
+                          -K    The number of QIKPROP subjobs. <10>
+                          -M    The number of MACROMODEL subjobs. <10>
+                          -S	Your Schrodinger path. <$SCHRODINGER>
+
+                        Thank you for your using, If you found any problem, Please contact wanglin3@shanghaitech.edu.cn.
 
 #后排插播一条广告，欢迎加入Schrödinger中文社区，请致信wanglin3@shanghaitech.edu.cn获取加群二维码。
