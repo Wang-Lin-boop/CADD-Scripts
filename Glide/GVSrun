@@ -37,6 +37,7 @@
     FilterReactivegroup=false
 
     #Docking
+    corse_ff="OPLS_2005"
     Force_Field="OPLS4"
 
 options(){
@@ -918,15 +919,15 @@ cat<<CONFGEN >> ${Inp_Name}
     MAXIMUM_ITERATION   5000
     OUTCONFS_PER_SEARCH 8
     CUTOFF   Extended
-[USEROUTS:$task]
-    USEROUTS   CONFGEN_OUT,
-    STRUCTOUT   CONFGEN_OUT
 [STAGE:COMBINE]
     STAGECLASS   combine.CombineStage
     INPUTS   ${Ligand_name}, CONFGEN_OUT
     OUTPUTS   CONFGEN_COMBINED,
     LABELFIELD   s_vsw_conformer_field
     LABELS   Original, OPLS
+[USEROUTS:$task]
+    USEROUTS   CONFGEN_OUT,
+    STRUCTOUT   CONFGEN_OUT
 CONFGEN
     Ligand_name="CONFGEN_COMBINED"
     TO_RMSD="${Ligand_name}"
@@ -959,15 +960,15 @@ cat<<CONFGEN >> ${Inp_Name}
     MAXIMUM_ITERATION   1000
     OUTCONFS_PER_SEARCH 4
     CUTOFF   Extended
-[USEROUTS:$task]
-    USEROUTS   CONFGEN_Fast_OUT,
-    STRUCTOUT   CONFGEN_Fast_OUT
 [STAGE:COMBINE]
     STAGECLASS   combine.CombineStage
     INPUTS   ${Ligand_name}, CONFGEN_Fast_OUT
     OUTPUTS   CONFGEN_COMBINED,
     LABELFIELD   s_vsw_conformer_field
     LABELS   Original, OPLS
+[USEROUTS:$task]
+    USEROUTS   CONFGEN_Fast_OUT,
+    STRUCTOUT   CONFGEN_Fast_OUT
 CONFGEN
     Ligand_name="CONFGEN_COMBINED"
     TO_RMSD="${Ligand_name}"
@@ -1000,15 +1001,15 @@ cat<<MMFF_CONFGEN >> ${Inp_Name}
     MAXIMUM_ITERATION   5000
     OUTCONFS_PER_SEARCH 8
     CUTOFF   Extended
-[USEROUTS:$task]
-    USEROUTS   MMFF_CONFGEN_OUT,
-    STRUCTOUT   MMFF_CONFGEN_OUT
 [STAGE:COMBINE]
     STAGECLASS   combine.CombineStage
     INPUTS   ${Ligand_name}, MMFF_CONFGEN_OUT
     OUTPUTS   CONFGEN_COMBINED,
     LABELFIELD   s_vsw_conformer_field
     LABELS   Original, MMFFS
+[USEROUTS:$task]
+    USEROUTS   MMFF_CONFGEN_OUT,
+    STRUCTOUT   MMFF_CONFGEN_OUT
 MMFF_CONFGEN
     Ligand_name="CONFGEN_COMBINED"
     TO_RMSD="${Ligand_name}"
@@ -1069,8 +1070,8 @@ MMFF_CONFGEN
 }
 
 parse_num_or_percentage(){
-    if [ "${1:-1}" == "%" ];then
-        echo "PERCENT_TO_KEEP   $1"
+    if [ "${1: -1}" == "%" ];then
+        echo "PERCENT_TO_KEEP   ${1%%%}"
     else
         echo "NUM_TO_KEEP   $1"
     fi
@@ -1090,7 +1091,7 @@ cat<<HTVS >> ${Inp_Name}
     GENCODES   YES
     OUTCOMPOUNDFIELD   s_vsw_compound_code
     OUTVARIANTFIELD   s_vsw_variant
-    UNIQUEFIELD   s_m_title
+    UNIQUEFIELD   NONE
 [STAGE:DOCK_HTVS]
     STAGECLASS   glide.DockingStage
     INPUTS   HTVS_RECOMBINE_OUT, GRID
@@ -1099,7 +1100,7 @@ cat<<HTVS >> ${Inp_Name}
     PRECISION   HTVS
     UNIQUEFIELD   s_vsw_compound_code
     ${KEEP_NUM}
-    FORCEFIELD  ${Force_Field}
+    FORCEFIELD  ${corse_ff}
     DOCKING_METHOD   confgen
     POSES_PER_LIG   1
     BEST_BY_TITLE   NO
@@ -1115,14 +1116,14 @@ cat<<HTVS >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS:$task]
-    USEROUTS   HTVS_OUT,
-    STRUCTOUT   HTVS_OUT
 [STAGE:PULL_HTVS]
     STAGECLASS   pull.PullStage
     INPUTS   HTVS_OUT, HTVS_RECOMBINE_OUT
     OUTPUTS   HTVS_OUT_ORIG,
-    UNIQUEFIELD   s_vsw_compound_code
+    UNIQUEFIELD   s_vsw_variant
+[USEROUTS:$task]
+    USEROUTS   HTVS_OUT,
+    STRUCTOUT   HTVS_OUT
 HTVS
     Ligand_name="HTVS_OUT_ORIG"
     TO_RMSD="${Ligand_name}"
@@ -1142,7 +1143,7 @@ cat<<HTVS >> ${Inp_Name}
     GENCODES   YES
     OUTCOMPOUNDFIELD   s_vsw_compound_code
     OUTVARIANTFIELD   s_vsw_variant
-    UNIQUEFIELD   s_m_title
+    UNIQUEFIELD   NONE
 [STAGE:DOCK_HTVS]
     STAGECLASS   glide.DockingStage
     INPUTS   HTVS_RECOMBINE_OUT, GRID
@@ -1153,7 +1154,7 @@ cat<<HTVS >> ${Inp_Name}
     MAXREF 200
     UNIQUEFIELD   s_vsw_compound_code
     ${KEEP_NUM}
-    FORCEFIELD  ${Force_Field}
+    FORCEFIELD  ${corse_ff}
     DOCKING_METHOD   confgen
     POSES_PER_LIG   1
     BEST_BY_TITLE   NO
@@ -1169,14 +1170,14 @@ cat<<HTVS >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS:$task]
-    USEROUTS   HTVS_OUT,
-    STRUCTOUT   HTVS_OUT
 [STAGE:PULL_HTVS]
     STAGECLASS   pull.PullStage
     INPUTS   HTVS_OUT, HTVS_RECOMBINE_OUT
     OUTPUTS   HTVS_OUT_ORIG,
-    UNIQUEFIELD   s_vsw_compound_code
+    UNIQUEFIELD   s_vsw_variant
+[USEROUTS:$task]
+    USEROUTS   HTVS_OUT,
+    STRUCTOUT   HTVS_OUT
 HTVS
     Ligand_name="HTVS_OUT_ORIG"
     TO_RMSD="${Ligand_name}"
@@ -1196,7 +1197,7 @@ cat<<HTVS >> ${Inp_Name}
     GENCODES   YES
     OUTCOMPOUNDFIELD   s_vsw_compound_code
     OUTVARIANTFIELD   s_vsw_variant
-    UNIQUEFIELD   s_m_title
+    UNIQUEFIELD   NONE
 [STAGE:DOCK_HTVS]
     STAGECLASS   glide.DockingStage
     INPUTS   HTVS_RECOMBINE_OUT, GRID
@@ -1205,7 +1206,7 @@ cat<<HTVS >> ${Inp_Name}
     PRECISION   HTVS
     UNIQUEFIELD   s_vsw_compound_code
     ${KEEP_NUM}
-    FORCEFIELD  ${Force_Field}
+    FORCEFIELD  ${corse_ff}
     DOCKING_METHOD   confgen
     EXPANDED_SAMPLING   YES
     POSES_PER_LIG   1
@@ -1222,14 +1223,14 @@ cat<<HTVS >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS:$task]
-    USEROUTS   HTVS_OUT,
-    STRUCTOUT   HTVS_OUT
 [STAGE:PULL_HTVS]
     STAGECLASS   pull.PullStage
     INPUTS   HTVS_OUT, HTVS_RECOMBINE_OUT
     OUTPUTS   HTVS_OUT_ORIG,
-    UNIQUEFIELD   s_vsw_compound_code
+    UNIQUEFIELD   s_vsw_variant
+[USEROUTS:$task]
+    USEROUTS   HTVS_OUT,
+    STRUCTOUT   HTVS_OUT
 HTVS
     Ligand_name="HTVS_OUT_ORIG"
     TO_RMSD="${Ligand_name}"
@@ -1249,7 +1250,7 @@ cat<<HTVS >> ${Inp_Name}
     GENCODES   YES
     OUTCOMPOUNDFIELD   s_vsw_compound_code
     OUTVARIANTFIELD   s_vsw_variant
-    UNIQUEFIELD   s_m_title
+    UNIQUEFIELD   NONE
 [STAGE:DOCK_HTVS]
     STAGECLASS   glide.DockingStage
     INPUTS   HTVS_RECOMBINE_OUT, GRID
@@ -1258,7 +1259,7 @@ cat<<HTVS >> ${Inp_Name}
     PRECISION   HTVS
     UNIQUEFIELD   s_vsw_compound_code
     ${KEEP_NUM}
-    FORCEFIELD  ${Force_Field}
+    FORCEFIELD  ${corse_ff}
     DOCKING_METHOD   confgen
     POSES_PER_LIG   1
     BEST_BY_TITLE   NO
@@ -1281,14 +1282,14 @@ cat<<HTVS >> ${Inp_Name}
     CORE_SNAP   YES
     CORE_POS_MAX_RMSD   0.52
     CORECONS_FALLBACK   YES
-[USEROUTS:$task]
-    USEROUTS   HTVS_OUT,
-    STRUCTOUT   HTVS_OUT
 [STAGE:PULL_HTVS]
     STAGECLASS   pull.PullStage
     INPUTS   HTVS_OUT, HTVS_RECOMBINE_OUT
     OUTPUTS   HTVS_OUT_ORIG,
-    UNIQUEFIELD   s_vsw_compound_code
+    UNIQUEFIELD   s_vsw_variant
+[USEROUTS:$task]
+    USEROUTS   HTVS_OUT,
+    STRUCTOUT   HTVS_OUT
 HTVS
     Ligand_name="HTVS_OUT_ORIG"
     TO_RMSD="${Ligand_name}"
@@ -1309,7 +1310,7 @@ cat<<HTVS >> ${Inp_Name}
     GENCODES   YES
     OUTCOMPOUNDFIELD   s_vsw_compound_code
     OUTVARIANTFIELD   s_vsw_variant
-    UNIQUEFIELD   s_m_title
+    UNIQUEFIELD   NONE
 [STAGE:DOCK_HTVS]
     STAGECLASS   glide.DockingStage
     INPUTS   HTVS_RECOMBINE_OUT, GRID
@@ -1319,7 +1320,7 @@ cat<<HTVS >> ${Inp_Name}
     CANONICALIZE NO
     UNIQUEFIELD   s_vsw_compound_code
     ${KEEP_NUM}
-    FORCEFIELD  ${Force_Field}
+    FORCEFIELD  ${corse_ff}
     DOCKING_METHOD   mininplace
     POSES_PER_LIG   1
     BEST_BY_TITLE   NO
@@ -1335,14 +1336,14 @@ cat<<HTVS >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS:$task]
-    USEROUTS   HTVS_OUT,
-    STRUCTOUT   HTVS_OUT
 [STAGE:PULL_HTVS]
     STAGECLASS   pull.PullStage
     INPUTS   HTVS_OUT, HTVS_RECOMBINE_OUT
     OUTPUTS   HTVS_OUT_ORIG,
-    UNIQUEFIELD   s_vsw_compound_code
+    UNIQUEFIELD   s_vsw_variant
+[USEROUTS:$task]
+    USEROUTS   HTVS_OUT,
+    STRUCTOUT   HTVS_OUT
 HTVS
     Ligand_name="HTVS_OUT_ORIG"
     TO_RMSD="${Ligand_name}"
@@ -1362,7 +1363,7 @@ cat<<HTVS >> ${Inp_Name}
     GENCODES   YES
     OUTCOMPOUNDFIELD   s_vsw_compound_code
     OUTVARIANTFIELD   s_vsw_variant
-    UNIQUEFIELD   s_m_title
+    UNIQUEFIELD   NONE
 [STAGE:DOCK_HTVS]
     STAGECLASS   glide.DockingStage
     INPUTS   HTVS_RECOMBINE_OUT, GRID
@@ -1371,7 +1372,7 @@ cat<<HTVS >> ${Inp_Name}
     PRECISION   HTVS
     UNIQUEFIELD   s_vsw_compound_code
     ${KEEP_NUM}
-    FORCEFIELD  ${Force_Field}
+    FORCEFIELD  ${corse_ff}
     DOCKING_METHOD   confgen
     POSES_PER_LIG   1
     BEST_BY_TITLE   NO
@@ -1388,14 +1389,14 @@ cat<<HTVS >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS:$task]
-    USEROUTS   HTVS_OUT,
-    STRUCTOUT   HTVS_OUT
 [STAGE:PULL_HTVS]
     STAGECLASS   pull.PullStage
     INPUTS   HTVS_OUT, HTVS_RECOMBINE_OUT
     OUTPUTS   HTVS_OUT_ORIG,
-    UNIQUEFIELD   s_vsw_compound_code
+    UNIQUEFIELD   s_vsw_variant
+[USEROUTS:$task]
+    USEROUTS   HTVS_OUT,
+    STRUCTOUT   HTVS_OUT
 HTVS
     Ligand_name="HTVS_OUT_ORIG"
     TO_RMSD="${Ligand_name}"
@@ -1431,7 +1432,7 @@ cat<<SP >> ${Inp_Name}
     BEST_BY_TITLE   NO
     LIG_VSCALE   0.8
     LIG_CCUT   0.15
-    MAXATOMS   300
+    MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
@@ -1479,7 +1480,7 @@ cat<<SP >> ${Inp_Name}
     BEST_BY_TITLE   NO
     LIG_VSCALE   0.8
     LIG_CCUT   0.15
-    MAXATOMS   300
+    MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
@@ -1529,7 +1530,7 @@ cat<<SP >> ${Inp_Name}
     BEST_BY_TITLE   NO
     LIG_VSCALE   0.8
     LIG_CCUT   0.15
-    MAXATOMS   300
+    MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
@@ -1577,7 +1578,7 @@ cat<<SP >> ${Inp_Name}
     BEST_BY_TITLE   NO
     LIG_VSCALE   0.8
     LIG_CCUT   0.15
-    MAXATOMS   300
+    MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
@@ -1633,7 +1634,7 @@ cat<<SP >> ${Inp_Name}
     BEST_BY_TITLE   NO
     LIG_VSCALE   0.8
     LIG_CCUT   0.15
-    MAXATOMS   300
+    MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
@@ -1683,7 +1684,7 @@ cat<<SP >> ${Inp_Name}
     BEST_BY_TITLE   NO
     LIG_VSCALE   0.8
     LIG_CCUT   0.15
-    MAXATOMS   300
+    MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
@@ -1731,7 +1732,7 @@ cat<<SP >> ${Inp_Name}
     BEST_BY_TITLE   NO
     LIG_VSCALE   0.8
     LIG_CCUT   0.15
-    MAXATOMS   300
+    MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
@@ -1778,7 +1779,7 @@ cat<<XP >> ${Inp_Name}
     BEST_BY_TITLE   NO
     LIG_VSCALE   0.8
     LIG_CCUT   0.15
-    MAXATOMS   300
+    MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
@@ -1827,7 +1828,7 @@ cat<<XP >> ${Inp_Name}
     BEST_BY_TITLE   NO
     LIG_VSCALE   0.8
     LIG_CCUT   0.15
-    MAXATOMS   300
+    MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
@@ -1878,7 +1879,7 @@ cat<<XP >> ${Inp_Name}
     BEST_BY_TITLE   NO
     LIG_VSCALE   0.8
     LIG_CCUT   0.15
-    MAXATOMS   300
+    MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
@@ -1927,7 +1928,7 @@ cat<<XP >> ${Inp_Name}
     BEST_BY_TITLE   NO
     LIG_VSCALE   0.8
     LIG_CCUT   0.15
-    MAXATOMS   300
+    MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
@@ -1984,7 +1985,7 @@ cat<<XP >> ${Inp_Name}
     BEST_BY_TITLE   NO
     LIG_VSCALE   0.8
     LIG_CCUT   0.15
-    MAXATOMS   300
+    MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
@@ -2033,7 +2034,7 @@ cat<<XP >> ${Inp_Name}
     BEST_BY_TITLE   NO
     LIG_VSCALE   0.8
     LIG_CCUT   0.15
-    MAXATOMS   300
+    MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
@@ -2082,7 +2083,7 @@ cat<<XP >> ${Inp_Name}
     BEST_BY_TITLE   NO
     LIG_VSCALE   0.8
     LIG_CCUT   0.15
-    MAXATOMS   300
+    MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
@@ -2412,7 +2413,7 @@ cat<<IFT >> ${Inp_Name}
     BEST_BY_TITLE   NO
     LIG_VSCALE   0.25
     LIG_CCUT   0.15
-    MAXATOMS   300
+    MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
     POSE_OUTTYPE   LIB
@@ -2642,7 +2643,7 @@ cat<<QMMM >> ${Inp_Name}
     BEST_BY_TITLE   NO
     LIG_VSCALE   0.8
     LIG_CCUT   0.15
-    MAXATOMS   300
+    MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
@@ -2758,14 +2759,16 @@ Params_check_and_report && for INPUT in `ls $input`
 do
     Parse_Running_Mode $Running_Mode
     if [ -z $Job_Title ]; then
-        Job_Title="${Database}-${INPUT%%.zip*}-${Running_Mode}"
+        Job_Title="${Database}-$(basename ${INPUT%%.zip*})-${Running_Mode}"
     fi
     mkdir ${Job_Title}
     Inp_Name="${Job_Title}.inp"
     cd ${Job_Title}
     generate_INP #accept $Inp_Name
-    $SCHRODINGER/vsw ${Inp_Name} -OVERWRITE -adjust -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -REMOTEDRIVER -JOBNAME ${Job_Title} -host_glide "${HOST}:${Glide}" -host_ligprep "${HOST}:${LigPrep}" -host_phase "${HOST}:${Phase}" -host_prime "${HOST}:${Prime}" -host_mmod "${HOST}:${MACROMODEL}" -host_qsite "${HOST}:${Qsite}" -host_qikprop "${HOST}:${QIKPROP}" -TMPLAUNCHDIR
+    if [ $HOST == "localhost" ]; then
+        $SCHRODINGER/vsw ${Inp_Name} -OVERWRITE -adjust -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -JOBNAME ${Job_Title} -host_glide "${HOST}:${Glide}" -host_ligprep "${HOST}:${LigPrep}" -host_phase "${HOST}:${Phase}" -host_prime "${HOST}:${Prime}" -host_mmod "${HOST}:${MACROMODEL}" -host_qsite "${HOST}:${Qsite}" -host_qikprop "${HOST}:${QIKPROP}" -TMPLAUNCHDIR -WAIT
+    else
+        $SCHRODINGER/vsw ${Inp_Name} -OVERWRITE -adjust -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -JOBNAME ${Job_Title} -host_glide "${HOST}:${Glide}" -host_ligprep "${HOST}:${LigPrep}" -host_phase "${HOST}:${Phase}" -host_prime "${HOST}:${Prime}" -host_mmod "${HOST}:${MACROMODEL}" -host_qsite "${HOST}:${Qsite}" -host_qikprop "${HOST}:${QIKPROP}" -TMPLAUNCHDIR
+    fi
     cd ..
 done
-
-
