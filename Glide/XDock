@@ -121,6 +121,10 @@ do
         Njobs=$OPTARG;;
     S)
         SCHRODINGER=$OPTARG;;
+    R)
+        rosetta_app=$OPTARG;;
+    B)
+        rosetta_db=$OPTARG;;
     P)
         Protein_Input=`readlink -f $OPTARG`;;
     L)
