@@ -64,7 +64,7 @@ XDock -P <Target Library> -L <Ligand File or Library> -H HPC_CPU -N 50 -p true -
 XDock -P <Target Library> -L <Ligand File or Library> -H HPC_CPU -N 50 -p true -l true -s 2 -d
 
 Input parameter:
-  -P	Path to Protein Library of your interest.
+  -P	Path to Protein Library.
   -L    Ligand File or Library, in *.pdb, *.sdf, *.mae or *.maegz formats.
 
 XDock control parameter:
@@ -203,7 +203,7 @@ Mode: ${Mode}
 Inputted Proteins: ${Protein_Input}
 Inputted Ligands: ${Ligand_Input}
 Protein Preparation: ${ProPrep} by ${Rosetta_Jd2_or_Schrodinger}
-SiteMap: ${SiteMap}
+SiteMap: ${Site_Num}
 Flexible Docking: ${Docking}
 Induce Fit Docking: ${Induce_Fit}
 
@@ -221,15 +221,15 @@ fi
 
 if [ $ProPrep == "true" ];then
     if [ $Rosetta_Jd2_or_Schrodinger == "Rosetta_Jd2" ];then
-        mkdir $(basename ${Protein_Input})-OUT
-        ls $Protein_Input | parallel -j $Njobs $rosetta_app/score_jd2.static.linuxgccrelease -database $rosetta_db -in:file:s ${Protein_Input}/{} -out:file:scorefile ${Protein_Input}_jd2.sc -out:path:pdb ${Protein_Input}-OUT -score:weights ref2015_cart -out:pdb -ex1 -ex2aro -ignore_zero_occupancy false -in:ignore_unrecognized_res true
-        Protein_to_DOCK=`readlink -f ${Protein_Input}-OUT`
+        mkdir $(basename (readlink -f ${Protein_Input}))-OUT
+        ls $Protein_Input | parallel -j $Njobs $rosetta_app/score_jd2.static.linuxgccrelease -database $rosetta_db -in:file:s ${Protein_Input}/{} -out:file:scorefile ${Protein_Input}_jd2.sc -out:path:pdb $(basename (readlink -f ${Protein_Input}))-OUT -score:weights ref2015_cart -out:pdb -ex1 -ex2aro -ignore_zero_occupancy false -in:ignore_unrecognized_res true
+        Protein_to_DOCK=$(basename (readlink -f ${Protein_Input}))-OUT
         PPREP="FALSE"
     elif [ $Rosetta_Jd2_or_Schrodinger == "Schrodinger" ];then
         PPREP="TRUE"
         Protein_to_DOCK=${Protein_Input}
     else
-        echo "Your Option of Protein Preparation Method: $Rosetta_Jd2_or_Schrodinger is Invalid."
+        echo "Your Option of Protein Preparation Method: ${Rosetta_Jd2_or_Schrodinger} is Invalid."
         exit
     fi
 elif [ $ProPrep == "false" ];then
@@ -299,9 +299,9 @@ else
     exit
 fi
 
-mkdir ${Mode}
+mkdir ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input})
 Job_Dir=${PWD}
-cd ${Mode}
+cd ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input})
 
 # Xglide Module
 if [ $Xglide == "true" ];then
@@ -362,7 +362,7 @@ echo ""
 
 ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -TMPLAUNCHDIR -OVERWRITE Xglide-${Mode}.inp
 
-fi # Xglide Module
+fi && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!" # Xglide Module
 
 # Induce Fit Module
 if [ "$Induce_Fit"x == "true"x ];then
@@ -448,7 +448,7 @@ echo ""
     ${SCHRODINGER}/ifd -NGLIDECPU ${Njobs} -NPRIMECPU ${Prime} IFT-${Mode}.inp -NOLOCAL -HOST ${HOST} -SUBHOST ${HOST} -TMPLAUNCHDIR
 
 
-fi # Induce Fit Module
+fi && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!" # Induce Fit Module
 
 if [ "$Native"x == "true"x ];then
 
@@ -469,8 +469,7 @@ echo ""
 
 ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -TMPLAUNCHDIR -OVERWRITE Redock-${Mode}.inp
 
-fi # Native redock
+fi && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!" # Native redock
 
 
 cd ..
-echo "Job $Mode has been submitted!"
