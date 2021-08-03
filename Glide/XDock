@@ -221,9 +221,9 @@ fi
 
 if [ $ProPrep == "true" ];then
     if [ $Rosetta_Jd2_or_Schrodinger == "Rosetta_Jd2" ];then
-        mkdir $(basename (readlink -f ${Protein_Input}))-OUT
-        ls $Protein_Input | parallel -j $Njobs $rosetta_app/score_jd2.static.linuxgccrelease -database $rosetta_db -in:file:s ${Protein_Input}/{} -out:file:scorefile ${Protein_Input}_jd2.sc -out:path:pdb $(basename (readlink -f ${Protein_Input}))-OUT -score:weights ref2015_cart -out:pdb -ex1 -ex2aro -ignore_zero_occupancy false -in:ignore_unrecognized_res true
-        Protein_to_DOCK=$(basename (readlink -f ${Protein_Input}))-OUT
+        mkdir $(basename $(readlink -f ${Protein_Input}))-OUT
+        ls $Protein_Input | parallel -j $Njobs $rosetta_app/score_jd2.static.linuxgccrelease -database $rosetta_db -in:file:s ${Protein_Input}/{} -out:file:scorefile ${Protein_Input}_jd2.sc -out:path:pdb $(basename $(readlink -f ${Protein_Input}))-OUT -score:weights ref2015_cart -out:pdb -ex1 -ex2aro -ignore_zero_occupancy false -in:ignore_unrecognized_res true
+        Protein_to_DOCK=$(basename $(readlink -f ${Protein_Input}))-OUT
         PPREP="FALSE"
     elif [ $Rosetta_Jd2_or_Schrodinger == "Schrodinger" ];then
         PPREP="TRUE"
