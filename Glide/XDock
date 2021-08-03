@@ -223,7 +223,7 @@ if [ $ProPrep == "true" ];then
     if [ $Rosetta_Jd2_or_Schrodinger == "Rosetta_Jd2" ];then
         mkdir $(basename $(readlink -f ${Protein_Input}))-OUT
         ls $Protein_Input | parallel -j $Njobs $rosetta_app/score_jd2.static.linuxgccrelease -database $rosetta_db -in:file:s ${Protein_Input}/{} -out:file:scorefile ${Protein_Input}_jd2.sc -out:path:pdb $(basename $(readlink -f ${Protein_Input}))-OUT -score:weights ref2015_cart -out:pdb -ex1 -ex2aro -ignore_zero_occupancy false -in:ignore_unrecognized_res true
-        Protein_to_DOCK=$(basename $(readlink -f ${Protein_Input}))-OUT
+        Protein_to_DOCK=`readlink -f $(basename $(readlink -f ${Protein_Input}))-OUT`
         PPREP="FALSE"
     elif [ $Rosetta_Jd2_or_Schrodinger == "Schrodinger" ];then
         PPREP="TRUE"
@@ -360,9 +360,9 @@ fi
 echo "Submitting Flexible Docking Jobs......"
 echo ""
 
-${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -TMPLAUNCHDIR -OVERWRITE Xglide-${Mode}.inp
+${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -TMPLAUNCHDIR -OVERWRITE Xglide-${Mode}.inp  && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!"
 
-fi && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!" # Xglide Module
+fi # Xglide Module
 
 # Induce Fit Module
 if [ "$Induce_Fit"x == "true"x ];then
@@ -467,9 +467,7 @@ INP0
 echo "Submitting Native re-docking Jobs......"
 echo ""
 
-${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -TMPLAUNCHDIR -OVERWRITE Redock-${Mode}.inp
+${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -TMPLAUNCHDIR -OVERWRITE Redock-${Mode}.inp  && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!"
 
-fi && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!" # Native redock
-
-
+fi # Native redock
 cd ..
