@@ -1,9 +1,9 @@
 # Schrodinger-Script
 Scripts to run Schrödinger jobs.
 
-Vsgo GVSrun plmd DSMDrun XDock
+Scripts
 ----
-Linux shell scripts to run Virual Screening, Molecular Dynamics Simulation in Schrodinger.
+Linux shell scripts (`Vsgo GVSrun plmd DSMDrun XDock`) to run Virual Screening, Molecular Dynamics Simulation in Schrodinger.
 Using -h option to show help information for this scripts, such as `GVSrun -h`.
 
 ```
