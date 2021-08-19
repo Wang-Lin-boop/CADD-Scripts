@@ -19,9 +19,13 @@ GVSrun and plmd is higher recommoned than Vsgo and DSMDrun.
 Environment Variables
 ----
 These environmental variables are necessary: 
+
 1:`SCHRODINGER` (installation path of Schrodinger) is necessary for `GVSrun`, `Vsgo` and `XDock`;
+
 2:`compound_library` (compound library for your compound databases) is necessary for `GVSrun`;
+
 3:`Desmond` (installation path of Schrodinger or Academic Desmond) is necessary for `plmd` and `DSMDrun`;
+
 4:`rosetta_app` or `rosetta_db` (installation path of rosetta) is optional for `XDock`;
 
 You can add those Environment Variables to your `~/.bashrc`!
