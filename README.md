@@ -1,6 +1,5 @@
 # Schrodinger-Script
-Some Script to run Schrödinger jobs on HPC.
-These scripts need to be run on the Linux cluster where Schrodinger is installed.
+Scripts to run Schrödinger jobs.
 
 Vsgo GVSrun plmd DSMDrun XDock
 ----
