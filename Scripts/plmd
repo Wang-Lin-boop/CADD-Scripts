@@ -272,7 +272,6 @@ if [ "$Analysis"x == "true"x ];then
 cat<<MSJAA >> plmd.msj
 pl_analysis {
     ligand_asl = "$LigandASL"
-    protein_asl = "$ProteinASL"
 }
 MSJAA
 fi
@@ -320,7 +319,6 @@ Simulation control parameter:
   -t    Enter the Molecular dynamics simulation time for the product simulation, in ns. <100>
   -T    Specify the temperature to be used, in kelvin. <310>
   -N    Number of Repeat simulation with different random numbers. <1>
-  -P    Define a ASL to protein, such as "protein".
   -L    Define a ASL to ligand, such as "res.ptype UNK".
   -q    Turn off protein-ligand analysis.
   -u    Turn off md simulation, only system build.
@@ -361,7 +359,6 @@ HELP
     export frames=1000
     export Analysis=true
     export trunoff_md=false
-    export ProteinASL="protein"
     export LigandASL="res.ptype UNK"
     export constraint=false
     export constraintASL="chain.name A AND backbone"
@@ -375,7 +372,7 @@ HELP
     # Desmond
     export Desmond=${Desmond}
 
-while getopts ":hi:S:nb:s:RF:m:t:T:N:P:L:C:f:o:H:G:D:qu" opt
+while getopts ":hi:S:nb:s:RF:m:t:T:N:L:C:f:o:H:G:D:qu" opt
 do
   case $opt in
     h)
@@ -550,9 +547,9 @@ for i in `ls $input`; do
         if [ -d ${i%%.*}-${seed}-md ];then
             rm -r ${i%%.*}-${seed}-md
             echo "Remove all old files in ${i%%.*}-${seed}-md."
-            mkdir ${i%%.*}-${seed}-md
+            mkdir -p ${i%%.*}-${seed}-md
         else
-            mkdir ${i%%.*}-${seed}-md
+            mkdir -p ${i%%.*}-${seed}-md
         fi
         cd ${i%%.*}-${seed}-md
         gen_cfg
