@@ -63,6 +63,12 @@ XDock -P <Target Library> -L <Ligand File or Library> -H HPC_CPU -N 50 -p true -
 4) Just to generate grids.
 XDock -P <Target Library> -L <Ligand File or Library> -H HPC_CPU -N 50 -p true -l true -s 2 -d
 
+NOTE: The results will save into a "Xglide-MODE_topcomplexes.maegz" file, you can run MMGBSA to re-rank the results.
+1) Windows in Schrodinger Power Shell
+prime_mmgbsa.exe -job_type REAL_MIN  -rflexdist 4 -jobname XDOCK-MMGBSA -ligand "res.ptype UNK" -NJOBS 8 -HOST localhost *_topcomplexes.maegz
+2) Linux
+prime_mmgbsa -job_type REAL_MIN  -rflexdist 4 -jobname XDOCK-MMGBSA -ligand "res.ptype UNK" -NJOBS 40 -HOST HPC_CPU *_topcomplexes.maegz
+
 Input parameter:
   -P	Path to Protein Library.
   -L    Ligand File or Library, in *.pdb, *.sdf, *.mae or *.maegz formats.
@@ -225,7 +231,7 @@ fi
 
 if [ $ProPrep == "true" ];then
     if [ $Rosetta_Jd2_or_Schrodinger == "Rosetta_Jd2" ];then
-        mkdir $(basename $(readlink -f ${Protein_Input}))-OUT
+        mkdir -p $(basename $(readlink -f ${Protein_Input}))-OUT
         ls $Protein_Input | parallel -j $Njobs $rosetta_app/score_jd2.static.linuxgccrelease -database $rosetta_db -in:file:s ${Protein_Input}/{} -out:file:scorefile ${Protein_Input}_jd2.sc -out:path:pdb $(basename $(readlink -f ${Protein_Input}))-OUT -score:weights ref2015_cart -out:pdb -ex1 -ex2aro -ignore_zero_occupancy false -in:ignore_unrecognized_res true
         Protein_to_DOCK=`readlink -f $(basename $(readlink -f ${Protein_Input}))-OUT`
         PPREP="FALSE"
@@ -303,7 +309,7 @@ else
     exit
 fi
 
-mkdir ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input})
+mkdir -p ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input})
 Job_Dir=${PWD}
 cd ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input})
 
