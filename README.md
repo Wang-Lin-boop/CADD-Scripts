@@ -7,7 +7,7 @@ Linux shell scripts (`Vsgo GVSrun plmd DSMDrun XDock`) to run Virual Screening, 
 Using -h option to show help information for this scripts, such as `GVSrun -h`.
 
 ```
-   Vsgo or GVSrun: Virual Screening;
+   GVSrun or Vsgo: Virual Screening;
 
    plmd or DSMDrun: Molecular Dynamics Simulation;
 
