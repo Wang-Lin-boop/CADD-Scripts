@@ -1,0 +1,692 @@
+#!/bin/bash
+#########################################################################
+# XDock, Version 1.2.0
+# 2021, ShanghaiTech University, Wang Lin
+# Email: wanglin3@shanghaitech.edu.cn
+#########################################################################
+
+# Default
+    #Input
+    Protein_Input="Protein_lib"
+    Ligand_Input="Ligand_Lib"
+
+    Peptide_Segment=false
+    Peptide_Length=12
+    Peptide_Stepwise=5
+    
+    # Job Control
+    Mode="SITEMAP"
+
+    ligPrep="epik"
+    ProPrep="rough"
+
+    By_Center=false
+    By_Complex=true
+    By_SiteMap=true
+
+    Xglide=true
+    Docking=true
+    Induce_Fit=false
+    Grid_in=false
+    
+    Grid_Center=""
+    Site_Num=2
+    Pose_Num=1
+    PRECISION="SP"
+    OUT_com=1
+    Prime=10
+    Ligand_ASL="A:999"
+    Force_Field="OPLS_2005"
+    Distance=5.0
+    SAMPLING=1
+    MAXKEEP=5000
+    scalingVdW=1.0
+
+    box_inner=12
+    Box_Buffer=5
+
+    Peptide_docking=false
+    rosetta_version=mpi
+
+    Mode_List=("Normal" "Grid" "COMPD" "COMPI" "SITEMAP" "GCD" "GCI")
+    VAILD_PRECISION=("SP" "XP" "HTVS")
+
+    #Host and Schrodinger Path
+    HOST=HPC_CPU
+    Njobs=50
+    
+    SCHRODINGER=${SCHRODINGER}
+    rosetta_app=${rosetta_app}
+    rosetta_db=${rosetta_db}
+
+help(){
+cat<<HELP
+
+Perform Virtual Screening Workflow.
+
+Usage: XDock [OPTION] <parameter>
+
+Example: 
+1) Normal Reverse Docking and detecting pockets using SiteMap
+XDock -P <Targets Library> -p fine -L <Ligand File or Library> -m SITEMAP -s 5
+2) Only consider the protein-ligand complexes and Using the induce-fit docking.
+XDock -P <Targets Library> -p hopt -L <Ligand File or Library> -m COMPI
+3) Just to generate grids.
+XDock -P <Targets Library> -p hopt -L <Ligand File or Library> -s 3 -m SiteMapGrid
+4) Docking based on pre-generated grids.
+XDock -P <Grids Library> -p none -L <Ligand File or Library> -s 3 -m Dock
+5) Reverse Docking with targets and some disorder protein structures
+XDock -P <Targets Library> -p hopt -L <disorder protein or peptide File or Library> -t -m SITEMAP -s 3
+6) Fast Induce Fit Reverse Docking
+a. XDock -P <Targets Library> -p fine -L <Ligand File or Library> -m SITEMAP -s 5 -v 0.4 
+b. NOTE: The results will save into a "Xglide-MODE_topcomplexes.maegz" file, you can run MMGBSA to re-rank the results and relax complex structure.
+    b1) Windows in Schrodinger Power Shell
+    prime_mmgbsa.exe -job_type REAL_MIN  -rflexdist 4 -jobname XDOCK-MMGBSA -ligand "res.ptype UNK" -NJOBS 8 -HOST localhost *_topcomplexes.maegz
+    b2) Linux
+    prime_mmgbsa -job_type REAL_MIN  -rflexdist 4 -jobname XDOCK-MMGBSA -ligand "res.ptype UNK" -NJOBS 40 -HOST HPC_CPU *_topcomplexes.maegz
+
+Input parameter:
+  -P	Path to Protein Library.
+  -L    Ligand File or Library, in *.pdb, *.sdf, *.mae or *.maegz formats.
+  -d    Segment proteins in Ligand File or Library to Peptides, Ligand File must be pdb format. <12:5>
+            -d "12:5" means: length for each peptides is 15 aa, and Segmentation stepwise is 5 aa.
+
+XDock control parameter:
+  -l    Ligands prepared mode, default is false, use "-l true" to open the ligand preparation process. <epik>
+            The ligands will be processed using Schrödinger's LigPrep module.
+            none: do not prepare ligands.
+            epik: Generate het group states with Epik.
+            ionizer: Generate het group states with Ionizer.
+  -p    Protein need to be prepared, default is true, use "-p false" to close it. <rough>
+            none: do not prepare proteins.
+            rosetta: prepare proteins using rosetta score_jd2.
+            rough: add hydrogens + Ionizer. 
+            fine: Delete and re-add hydrogens, and generate het group states with Epik.
+            hopt: fine + optimize H-bond networks.
+            mini: hopt + constrained minimaztion.
+  -m    XDock Mode: <SITEMAP>
+            SITEMAP: Only protein pocket identifed by SiteMap, SP Docking.
+                Change the number of Grid files per protein generated using Sitemap by "-s <num>", default is 2.
+            Native: re-dock the ligand in input complex.
+            COMPD: Ligand position of protein-ligand complex, SP Docking.
+            GCD: User Defined Grid center, SP Docking.
+                Define pocket by Provided Grid center Coordinate, e.g. "-g 153.00, 65.023, 24.003".
+            SiteMapGrid: Grid Generation by SiteMap.
+            ComplexGrid: Grid Generation by Ligand position of Complex Structure.
+            CenterGrid: Grid Generation by center Coordinate.
+            Dock: Docking by input girds in Protein Library.
+            COMPI: Ligand position of protein-ligand complex, Induce Fit Docking.
+            GCI: User Defined Grid center, Induce Fit Docking.
+                Define pocket by Provided Grid center Coordinate, e.g. "-g 153.00, 65.023, 24.003".
+
+  -v    scalingVdW, reducing this value and collocating with MMGBSA refine to induce receptor fit ligands. 0.5 is OK. <1.0>
+  -g    Only the grid center Coordinate will be considered.
+            Define a grid center Coordinate to docking, additionally. Such as "153.00, 65.023, 24.003".
+  -s    The number of Grid files per protein generated using Sitemap. <2>
+  -n    Number of pose per ligand. <1>
+  -o    Number of Top Complexes to Output for per protein. <1>
+  -x    The PRECISION of Docking, SP, XP and HTVS are supported. Default is SP.
+  -A    Reference Ligand ASL to induce Fit Docking. Such as: "A:999"
+  -D    residues within the specified distance will be set to flexible in Induce Fit Docking. default is 5.0 Å.
+  -F    Force Field in Induce Fit Docking, OPLS_2005, OPLS3e or OPLS4.
+  -e    Enchanced Sampling.
+  -t    Peptide docking, if your ligands is peptides, please use -t. Default is turn off.
+  -i    Inner Box size. The space for ligand centroid motion. <12>
+  -b    Box Outer buffer, reducing this value increases sampling efficiency but may fall into local minimization. <5>
+        The grid size will be the sum of the inner box size (default 12), the computed max ligand size, and the box outer buffer.
+
+Job control:
+  -H	Hostname of your queue, defult is HPC_CPU.
+  -N    The number of threads you want to use in this task. No more than 100. <50>
+  -r    The number of Prime License you had. <10>
+  -S	Your Schrodinger path. <$SCHRODINGER>
+  -R    Your Rosetta path, Must be mpi version. <$rosetta_app>
+  -B    Your Rosetta Database. <$rosetta_db>
+  -V    Rosetta version, static or mpi. <mpi>
+
+Thank you for your using, If you found any problem, Please contact wanglin3@shanghaitech.edu.cn.
+HELP
+}
+
+while getopts ":hP:L:l:p:H:N:S:g:s:m:n:o:x:A:F:D:r:R:B:ev:tV:d:b:i:" opt
+do
+  case $opt in
+    h)
+        help
+        exit;;
+    H)
+        HOST=$OPTARG;;
+    N)
+        Njobs=$OPTARG;;
+    S)
+        SCHRODINGER=$OPTARG;;
+    R)
+        rosetta_app=$OPTARG;;
+    B)
+        rosetta_db=$OPTARG;;
+    V)
+        rosetta_version=$OPTARG;;
+    P)
+        Protein_Input=`readlink -f $OPTARG`;;
+    L)
+        Ligand_Input=`readlink -f $OPTARG`;;
+    d)
+        Peptide_Segment=true
+        Segment_array=(${OPTARG//:/ })
+        Peptide_Length=${Segment_array[0]}
+        Peptide_Stepwise=${Segment_array[1]}
+        ;;
+    l)
+        ligPrep=$OPTARG;;
+    p)
+        ProPrep=$OPTARG;;
+    m)
+        Mode=$OPTARG
+        ProPrep="none"
+        ;;
+    v)
+        scalingVdW=$OPTARG;;
+    i)
+        box_inner=$OPTARG;;
+    b)
+        Box_Buffer=$OPTARG;;
+    g)
+        Grid_Center=$OPTARG;;
+    s)
+        Site_Num=$OPTARG;;
+    n)
+        Pose_Num=$OPTARG;;
+    o)
+        OUT_com=$OPTARG;;
+    x)
+        PRECISION=$OPTARG;;
+    r)
+        Prime=$OPTARG;;
+    A)
+        Ligand_ASL=$OPTARG;;
+    F)
+        Force_Field=$OPTARG;;
+    D)
+        Distance=$OPTARG;;
+    e)
+        SAMPLING=3
+        MAXKEEP=15000;;
+    t)
+        Peptide_docking=true;;
+    ?)
+        echo ""
+        echo "Error: Do not use undefined options."
+        echo ""
+        help
+        exit;;
+    esac
+done
+
+if [ -d ${SCHRODINGER} ];then
+  if [ "${SCHRODINGER}" == "" ];then
+    echo "SCHRODINGER not found. Please check your SCHRODINGER Path."
+    exit
+  fi
+  if [ "`grep -c $HOST ${SCHRODINGER}/schrodinger.hosts`" == "0" ];then
+    echo $HOST "Host not found."
+    exit
+  fi
+else
+  echo "SCHRODINGER not found. Please check your SCHRODINGER Path."
+  exit
+fi
+
+function testarray (){
+testlogic=false
+for line in $2
+do
+if [ "$1"x == "$line"x ];then
+  testlogic=true;break;fi
+done
+if [ "${testlogic}"x == "true"x ];then
+  echo "Note: Parameter "$1" is vaild.";
+else
+  echo "Error: your parameter "$1" is unvaild, please check it." ;echo ""
+  exit
+fi
+}
+testarray $PRECISION "${VAILD_PRECISION[*]}"
+testarray $Mode "${Mode_List[*]}"
+
+cat<<OUTPUTLOG
+XDock Workflow Parameter:
+
+Mode: ${Mode}
+
+Inputted Proteins: ${Protein_Input}
+Inputted Ligands: ${Ligand_Input}
+Protein Preparation: ${ProPrep} by ${Rosetta_Jd2_or_Schrodinger}
+SiteMap: ${Site_Num}
+Flexible Docking: ${Docking}
+Induce Fit Docking: ${Induce_Fit}
+
+OUTPUTLOG
+
+if [ ${Peptide_Segment} == "true" ];then
+    mkdir -p Peptides_Lib
+cat << SEGMENT > Segment.jl
+#!/mnt/g/julia-1.4.2/bin/julia
+using BioStructures
+
+function splitPeptide(file,length,step)
+    filename = split(basename(file),".")[1]
+    if endswith(file,".pdb")
+        println(file," will be read as pdb file.","\n")
+        Structure = read(file,PDB)
+    elseif endswith(file,".cif")
+        println(file," will be read as cif file.","\n")
+        Structure = read(file,MMCIF)
+    else
+        println("Error: Input File Extensions not recognized.",file,"\n")
+    end
+    for model in Structure
+        modelname = modelnumber(model)
+        for chain in model
+            chainname = chainid(chain)
+            resiudenumber=0
+            isfritresiduenumberhadgot=0
+            fristresidue=1
+                for residue in chain
+                    if  isfritresiduenumberhadgot < 1
+                    fristresidue=resnumber(residue)
+                    isfritresiduenumberhadgot+=2
+                    resiudenumber=fristresidue
+                    end
+                    resiudenumber=resiudenumber + 1
+                end
+                for i in fristresidue:step:resiudenumber
+                    stratpoint=i
+                    endpoint=i + length
+                    if endpoint > resiudenumber
+                        continue
+                    end
+                    peptide = collectresidues(chain, res -> stratpoint <= resnumber(res) < endpoint)
+                    println("Residues form ",stratpoint," to ",endpoint," of ",filename,"-model_",modelname,"-chain_",chainname," has been split out.")
+                    writepdb("$filename-$modelname-$chainname-$stratpoint-$endpoint.pdb",peptide)
+                    stratpoint=stratpoint+step
+                    endpoint=endpoint+step
+                end
+        end
+    end    
+end
+
+function main()
+    print("What's your inputfile?\n")
+    const fileinput=readline(stdin)
+    print("Define a length for each peptide:\n")
+    const peptidelength=parse(Int,readline(stdin))
+    print("Specify a step size for peptide:\n")
+    const stepsize=parse(Int,readline(stdin))
+    splitPeptide(fileinput,peptidelength,stepsize)
+end
+
+main()
+SEGMENT
+    function Segment_peptides(){
+        ( echo "$1"; echo "$Peptide_Length"; echo "$Peptide_Stepwise" ) | julia Segment.jl
+    }; export -f Segment_peptides
+    cd Peptides_Lib
+    echo "Warning: Only pdb file in Protein Library will be considered when you trun on the -d option!"
+    ls ${Ligand_Input} | grep pdb$ | parallel -j $Njobs Segment_peptides ${Ligand_Input}/{}
+    cd ..
+    Ligand_Input="Peptides_Lib"
+fi
+
+if [ $ligPrep == "epik" ];then
+    LIGPREP="TRUE"
+    LIGPREP_EPIK="TRUE"
+elif [ $ligPrep == "ionizer" ];then
+    LIGPREP="TRUE"
+    LIGPREP_EPIK="FALSE"
+elif [ $ligPrep == "none" ];then
+    echo "You chose not to prepare ligands in this XDock Job."
+    LIGPREP="FALSE"
+    LIGPREP_EPIK="FALSE"
+else
+    echo "Your Option of Ligand Preparation: -l ${ligPrep} is Invalid."
+    exit
+fi
+
+if [ $ProPrep == "none" ];then
+    Protein_to_DOCK=`readlink -f ${Protein_Input}`
+    PPREP="FALSE"
+    PPREP_REHTREAT="FALSE"
+    PPREP_EPIK="FALSE"
+    PPREP_PROTASSIGN="FALSE"
+    PPREP_PROTASSIGN_EXHAUSTIVE="FALSE"
+    PPREP_IMPREF="FALSE"
+    PPREP_IMPREF_RMSD=0.30
+    PPREP_WATERDIST=3.0
+elif [ $ProPrep == "rosetta" ];then
+    mkdir -p $(basename $(readlink -f ${Protein_Input}))-OUT
+    ls $Protein_Input | parallel -j $Njobs $rosetta_app/score_jd2.${rosetta_version}.linuxgccrelease -database $rosetta_db -in:file:s ${Protein_Input}/{} -out:file:scorefile ${Protein_Input}_jd2.sc -out:path:pdb $(basename $(readlink -f ${Protein_Input}))-OUT -score:weights ref2015 -out:pdb -ex1 -ex2aro -ignore_zero_occupancy false -in:ignore_unrecognized_res false
+    Protein_to_DOCK=`readlink -f $(basename $(readlink -f ${Protein_Input}))-OUT`
+    PPREP="FALSE"
+elif [ $ProPrep == "rough" ];then
+    Protein_to_DOCK=${Protein_Input}
+    PPREP="TRUE"
+    PPREP_REHTREAT="FALSE"
+    PPREP_EPIK="FALSE"
+    PPREP_PROTASSIGN="FALSE"
+    PPREP_PROTASSIGN_EXHAUSTIVE="FALSE"
+    PPREP_IMPREF="FALSE"
+    PPREP_IMPREF_RMSD=0.30
+    PPREP_WATERDIST=3.0
+elif [ $ProPrep == "fine" ];then
+    Protein_to_DOCK=${Protein_Input}
+    PPREP="TRUE"
+    PPREP_REHTREAT="TRUE"
+    PPREP_EPIK="TRUE"
+    PPREP_PROTASSIGN="FALSE"
+    PPREP_PROTASSIGN_EXHAUSTIVE="FALSE"
+    PPREP_IMPREF="FALSE"
+    PPREP_IMPREF_RMSD=0.30
+    PPREP_WATERDIST=3.0
+elif [ $ProPrep == "hopt" ];then
+    Protein_to_DOCK=${Protein_Input}
+    PPREP="TRUE"
+    PPREP_REHTREAT="TRUE"
+    PPREP_EPIK="TRUE"
+    PPREP_PROTASSIGN="TRUE"
+    PPREP_PROTASSIGN_EXHAUSTIVE="FALSE"
+    PPREP_IMPREF="FALSE"
+    PPREP_IMPREF_RMSD=0.30
+    PPREP_WATERDIST=3.0
+elif [ $ProPrep == "mini" ];then
+    Protein_to_DOCK=${Protein_Input}
+    PPREP="TRUE"
+    PPREP_REHTREAT="TRUE"
+    PPREP_EPIK="TRUE"
+    PPREP_PROTASSIGN="TRUE"
+    PPREP_PROTASSIGN_EXHAUSTIVE="FALSE"
+    PPREP_IMPREF="TRUE"
+    PPREP_IMPREF_RMSD=0.30
+    PPREP_WATERDIST=3.0
+else
+    echo "Your Option of Protein Preparation: -p ${ProPrep} is Invalid."
+    exit
+fi
+
+# Job control "Normal" "Grid" "COMPD" "COMPI" "SITEMAP" "GCD" "GCI"
+if [ $Mode == "Normal" ];then
+    By_Center=false
+    By_Complex=true
+    By_SiteMap=true
+    Xglide=true
+    Docking=true
+    Induce_Fit=false
+elif [ $Mode == "SiteMapGrid" ];then
+    By_Center=false
+    By_Complex=false
+    By_SiteMap=true
+    Xglide=true
+    Docking=false
+    Induce_Fit=false
+elif [ $Mode == "ComplexGrid" ];then
+    By_Center=false
+    By_Complex=true
+    By_SiteMap=false
+    Xglide=true
+    Docking=false
+    Induce_Fit=false
+elif [ $Mode == "CenterGrid" ];then
+    By_Center=true
+    By_Complex=false
+    By_SiteMap=false
+    Xglide=true
+    Docking=false
+    Induce_Fit=false
+elif [ $Mode == "Dock" ];then
+    By_Center=false
+    By_Complex=false
+    By_SiteMap=false
+    Grid_in=true
+    Xglide=true
+    Docking=true
+    Induce_Fit=false
+elif [ $Mode == "COMPD" ];then
+    By_Center=false
+    By_Complex=true
+    By_SiteMap=false
+    Xglide=true
+    Docking=true
+    Induce_Fit=false
+elif [ $Mode == "COMPI" ];then
+    By_Center=false
+    By_Complex=true
+    By_SiteMap=false
+    Xglide=false
+    Docking=false
+    Induce_Fit=true
+elif [ $Mode == "SITEMAP" ];then
+    By_Center=false
+    By_Complex=false
+    By_SiteMap=true
+    Xglide=true
+    Docking=true
+    Induce_Fit=false
+elif [ $Mode == "GCD" ];then
+    By_Center=true
+    By_Complex=false
+    By_SiteMap=false
+    Xglide=true
+    Docking=true
+    Induce_Fit=false
+elif [ $Mode == "GCI" ];then
+    By_Center=true
+    By_Complex=false
+    By_SiteMap=false
+    Xglide=false
+    Docking=false
+    Induce_Fit=true
+elif [ $Mode == "Native" ];then
+    Native=true
+    Xglide=false
+    Induce_Fit=false
+else
+    echo "Unkown Error, Please contact wanglin3@shanghaitech.edu.cn."
+    exit
+fi
+
+mkdir -p ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input})
+Job_Dir=${PWD}
+cd ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input})
+
+# Xglide Module
+if [ $Xglide == "true" ];then
+
+cat<<INP0 > Xglide-${Mode}.inp
+#Job Dic.: ${Job_Dir}
+#Protein Lib: ${Protein_to_DOCK}
+#Ligand Input: ${Ligand_Input}
+INP0
+
+if [ $By_Complex == "true" ];then
+    echo "COMPLEX       ${Protein_to_DOCK}" >> Xglide-${Mode}.inp
+fi
+
+if [ $By_SiteMap == "true" ];then
+    echo "RECEPTOR       ${Protein_to_DOCK}" >> Xglide-${Mode}.inp
+    echo "SITEMAP       TRUE" >> Xglide-${Mode}.inp
+    echo "SITEMAP_MAXSITES      ${Site_Num}" >> Xglide-${Mode}.inp
+    echo "GRIDGEN_GRID_CENTER      SELF" >> Xglide-${Mode}.inp
+    echo "SITEMAP_FORCE       TRUE" >> Xglide-${Mode}.inp
+    echo "GRIDGEN_OUTERBOX       SELF" >> Xglide-${Mode}.inp
+fi
+
+if [ $By_Center == "true" ];then
+    echo "RECEPTOR       ${Protein_to_DOCK}" >> Xglide-${Mode}.inp
+    echo "SITEMAP       FALSE" >> Xglide-${Mode}.inp
+    echo "GRIDGEN_GRID_CENTER      ${Grid_Center}" >> Xglide-${Mode}.inp
+fi
+
+if [ $Grid_in == "true" ];then
+    for grd in `ls ${Protein_to_DOCK} | grep "grd$|zip$"`;do
+        echo "GRID      ${grd},-1" >> Xglide-${Mode}.inp
+    done 
+else
+cat<<INP1 >> Xglide-${Mode}.inp
+PPREP       ${PPREP}
+PPREP_REHTREAT      ${PPREP_REHTREAT}
+PPREP_EPIK      ${PPREP_EPIK}
+PPREP_PROTASSIGN    ${PPREP_PROTASSIGN}
+PPREP_PROTASSIGN_EXHAUSTIVE     ${PPREP_PROTASSIGN_EXHAUSTIVE}
+PPREP_IMPREF        ${PPREP_IMPREF}
+PPREP_IMPREF_RMSD   ${PPREP_IMPREF_RMSD}
+PPREP_WATERDIST     ${PPREP_WATERDIST}
+GRIDGEN_INNERBOX        ${box_inner}
+GRIDGEN_OUTERBOX_BUFFER     ${Box_Buffer}
+GRIDGEN_RECEP_VSCALE    ${scalingVdW}
+GRIDGEN_PEPTIDE     ${Peptide_docking}
+INP1
+fi
+
+if [ $Docking == "true" ];then
+cat<<INP2 >> Xglide-${Mode}.inp
+LIGAND      ${Ligand_Input}
+MAXLIGATOMS     300
+LIGPREP     ${LIGPREP}
+LIGPREP_EPIK    ${LIGPREP_EPIK}
+DOCK_PRECISION      ${PRECISION}
+DOCK_LIG_VSCALE     ${scalingVdW}
+DOCK_POSES_PER_LIG      ${Pose_Num}
+DOCK_POSE_OUTTYPE       poseviewer
+GENERATE_TOP_COMPLEXES      ${OUT_com}
+DOCK_NENHANCED_SAMPLING     ${SAMPLING}
+DOCK_MAXKEEP    ${MAXKEEP}
+DOCK_PEPTIDE    ${Peptide_docking}
+INP2
+elif [ $Docking == "false"];then
+    echo "SKIP_DOCKING      TRUE" >> Xglide-${Mode}.inp
+else
+    echo "Unkown Error, Please contact wanglin3@shanghaitech.edu.cn."
+    exit
+fi
+
+echo "Submitting Flexible Docking Jobs......"
+echo ""
+if [ $HOST == "localhost" ]; then
+    ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST localhost -WAIT -TMPLAUNCHDIR -OVERWRITE Xglide-${Mode}.inp  
+else
+    ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -TMPLAUNCHDIR -OVERWRITE Xglide-${Mode}.inp  
+fi
+
+fi && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!" # Xglide Module
+
+# Induce Fit Module
+if [ "$Induce_Fit"x == "true"x ];then
+
+    for i in `ls ${Protein_to_DOCK}`;do
+    $SCHRODINGER/utilities/structcat -i ${Protein_to_DOCK}/${i} -o Proteins_to_InduceFitDock.maegz ; done
+    for i in `ls $Ligand_Input`;do
+    $SCHRODINGER/utilities/structcat -i ${Ligand_Input}/${i} -o Ligands_to_InduceFitDock.maegz;done
+    if [ $By_Complex == "true" ];then
+        BINDING_SITE="ligand ${Ligand_ASL}"
+    elif [ $By_Center == "true" ];then
+        BINDING_SITE="coords ${Grid_Center}"
+    else
+        echo "Induce Fit Docking cannot to using SiteMap."
+    fi 
+cat<<IFT1 > IFT-${Mode}.inp
+INPUT_FILE  Proteins_to_InduceFitDock.maegz
+IFT1
+
+if [ $ProPrep == "true" ];then
+    echo "STAGE PPREP
+    RMSD    0.5
+    " >>  IFT-${Mode}.inp
+fi
+
+cat<<IFT2 >> IFT-${Mode}.inp
+STAGE VDW_SCALING
+  BINDING_SITE ${BINDING_SITE}
+
+STAGE PREDICT_FLEXIBILITY
+  BINDING_SITE  ${BINDING_SITE}
+
+STAGE INITIAL_DOCKING
+  BINDING_SITE  ${BINDING_SITE}
+  INNERBOX 12.0
+  OUTERBOX 30.0
+  LIGAND_FILE Ligands_to_InduceFitDock.maegz
+  LIGANDS_TO_DOCK all
+  DOCKING_RINGCONFCUT 10.0
+  DOCKING_AMIDE_MODE penal
+  DOCKING_FORCEFIELD ${Force_Field}
+
+STAGE COMPILE_RESIDUE_LIST
+  DISTANCE_CUTOFF ${Distance}
+
+STAGE PRIME_REFINEMENT
+  NUMBER_OF_PASSES 1
+  USE_MEMBRANE no
+  OPLS_VERSION  ${Force_Field}
+
+STAGE SORT_AND_FILTER
+  POSE_FILTER r_psp_Prime_Energy
+  POSE_KEEP 30.0
+
+STAGE SORT_AND_FILTER
+  POSE_FILTER r_psp_Prime_Energy
+  POSE_KEEP 20#
+
+STAGE GLIDE_DOCKING2
+  BINDING_SITE ligand Z:999
+  INNERBOX 10.0
+  OUTERBOX auto
+  LIGAND_FILE Ligands_to_InduceFitDock.maegz
+  LIGANDS_TO_DOCK existing
+  DOCKING_PRECISION SP
+  DOCKING_CANONICALIZE False
+  DOCKING_RINGCONFCUT 10.0
+  DOCKING_AMIDE_MODE penal
+  PRECISION ${PRECISION}
+  DOCKING_FORCEFIELD ${Force_Field}
+
+STAGE SCORING
+  SCORE_NAME  r_psp_IFDScore
+  TERM 1.0,r_i_glide_gscore,0
+  TERM 0.05,r_psp_Prime_Energy,1
+  REPORT_FILE report.csv
+
+IFT2
+
+echo "Submitting Induce Fit Docking Jobs......"
+echo ""
+if [ $HOST == "localhost" ]; then
+    ${SCHRODINGER}/ifd -NGLIDECPU ${Njobs} -NPRIMECPU ${Prime} IFT-${Mode}.inp -HOST localhost -TMPLAUNCHDIR -WAIT
+else
+    ${SCHRODINGER}/ifd -NGLIDECPU ${Njobs} -NPRIMECPU ${Prime} IFT-${Mode}.inp -NOLOCAL -HOST ${HOST} -SUBHOST ${HOST} -TMPLAUNCHDIR
+fi
+
+fi && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!" # Induce Fit Module
+
+if [ "$Native"x == "true"x ];then
+
+cat<<INP0 > Redock-${Mode}.inp
+#Job Dic.: ${Job_Dir}
+#Protein Lib: ${Protein_to_DOCK}
+COMPLEX         ${Protein_to_DOCK}
+DOCK_PRECISION       ${PRECISION}
+GRIDGEN_GRID_CENTER  SELF
+NATIVEONLY           TRUE
+DOCK_POSES_PER_LIG      ${Pose_Num}
+DOCK_NENHANCED_SAMPLING ${SAMPLING}
+DOCK_POSE_OUTTYPE       poseviewer
+INP0
+
+echo "Submitting Native re-docking Jobs......"
+echo ""
+if [ $HOST == "localhost" ]; then
+    ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST localhost -WAIT -TMPLAUNCHDIR -OVERWRITE Redock-${Mode}.inp
+else
+    ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -TMPLAUNCHDIR -OVERWRITE Redock-${Mode}.inp  
+fi
+
+fi && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!" # Native redock
+cd ..

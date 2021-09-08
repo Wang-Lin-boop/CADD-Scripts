@@ -1,0 +1,607 @@
+#!/bin/bash
+#########################################################################
+# plmd, Version 1.2.0
+# 2021, ShanghaiTech University, Wang Lin
+# Email: wanglin3@shanghaitech.edu.cn
+#########################################################################
+
+function checkparam (){
+testlogic=false
+for line in $2
+do
+if [ "$1"x == "$line"x ];then
+  testlogic=true;break;fi
+done
+if [ "${testlogic}"x == "true"x ];then
+  echo "Note: Parameter "$1" is vaild.";
+else
+  echo "Error: your parameter "$1" is unvaild, please check it." ;echo ""
+  exit
+fi
+}
+
+function gen_cfg(){
+interval=`echo "scale=1;${mdtime} / ${frames}"|bc`
+cat<<MDCFG > plmd.cfg
+annealing = false
+backend = {
+}
+bigger_rclone = false
+checkpt = {
+    first = 0.0
+    interval = 240.06
+    name = "\$JOBNAME.cpt"
+    write_last_step = true
+}
+cpu = 1
+cutoff_radius = 9.0
+elapsed_time = 0.0
+energy_group = false
+eneseq = {
+    first = 0.0
+    interval = 1.2
+    name = "\$JOBNAME\$[_replica\$REPLICA\$].ene"
+}
+ensemble = {
+barostat = {
+    tau = 2.0
+}
+class = NPT
+method = MTK
+thermostat = {
+    tau = 1.0
+}
+}
+glue = solute
+maeff_output = {
+    first = 0.0
+    interval = 120.0
+    name = "\$JOBNAME\$[_replica\$REPLICA\$]-out.cms"
+    periodicfix = true
+    trjdir = "\$JOBNAME\$[_replica\$REPLICA\$]_trj"
+}
+meta = false
+meta_file = ?
+pressure = [1.01325 isotropic ]
+randomize_velocity = {
+    first = 0.0
+    interval = inf
+    seed = ${seed}
+    temperature = "@*.temperature"
+}
+$constraintDescription
+simbox = {
+    first = 0.0
+    interval = 1.2
+    name = "\$JOBNAME\$[_replica\$REPLICA\$]_simbox.dat"
+}
+surface_tension = 0.0
+taper = false
+temperature = [
+    [${temperature}.0 0 ]
+]
+time = ${mdtime}
+timestep = [0.002 0.002 0.006 ]
+trajectory = {
+    center = []
+    first = 0.0
+    format = dtr
+    frames_per_file = 250
+    interval = ${interval}
+    name = "\$JOBNAME\$[_replica\$REPLICA\$]_trj"
+    periodicfix = true
+    write_velocity = false
+}
+MDCFG
+}
+
+add_counterion(){
+    neutralizeion=$1
+cat<<EOF
+  add_counterion = {
+       ion = ${neutralizeion}
+       number = neutralize_system
+  }
+EOF
+};export -f add_counterion
+
+box(){
+    boxshape=$1
+    boxsize=$2
+cat<<EOF
+  box = {
+     shape = ${boxshape}
+     size = ${boxsize}
+     size_type = buffer
+  }
+EOF
+};export -f box
+
+setup_salt(){
+    saltconcentration=$1
+    positive_ion=$2
+    negative_ion=$3
+cat<<EOF
+  salt = {
+     concentration = ${saltconcentration}
+     negative_ion = ${negative_ion}
+     positive_ion = ${positive_ion}
+  }
+EOF
+};export -f setup_salt
+
+function sys_build(){
+    # genenate parts to system build for msj 
+    SYS_array=(${SYS_pipeline//:/ })
+    solvent=${SYS_array[0]}
+    neutralizeion=${SYS_array[1]}
+    salt_buffer_info=${SYS_array[2]}
+    [ ${first_input} == "no" ] || checkparam ${neutralizeion} "${all_ions_list[*]}"
+    [ ${first_input} == "no" ] || checkparam ${solvent} "${solventlist[*]}"
+    echo "build_geometry {" >> plmd.msj
+    add_counterion ${neutralizeion} >> plmd.msj
+    box ${boxshape} ${boxsize} >> plmd.msj
+    echo "  override_forcefield = ${override_forcefield}" >> plmd.msj
+    echo "  rezero_system = ${rezerosys}" >> plmd.msj
+    echo "  minimize_volume = ${minisys}" >> plmd.msj
+    salt_buffer_list=(${salt_buffer_info//+/ })
+    for salt_buffer in ${salt_buffer_list[@]} ;do
+        salt_buffer_array=(${salt_buffer//-/ })
+        saltconcentration=${salt_buffer_array[0]}
+        positive_ion=${salt_buffer_array[1]}
+        negative_ion=${salt_buffer_array[2]}
+        [ ${first_input} == "no" ] || checkparam ${positive_ion} "${positiveionlist[*]}"
+        [ ${first_input} == "no" ] || checkparam ${negative_ion} "${nagativeionlist[*]}"
+        setup_salt ${saltconcentration} ${positive_ion} ${negative_ion} >> plmd.msj
+    done
+    echo "  solvent = ${solvent}" >> plmd.msj
+    echo "}" >> plmd.msj
+cat<<MSJ2 >> plmd.msj
+assign_forcefield {
+  forcefield = ${ffid}
+  hydrogen_mass_repartition = ${hydrogen_mass_repartition}
+  ${water}
+  dir      = "."
+  compress = ""
+}
+MSJ2
+}
+
+function set_md(){
+# Generate MSJ file
+cat <<MD1 >> plmd.msj
+simulate {
+    title       = "Brownian Dynamics NVT, T = 10 K, small timesteps, and restraints on solute_heavy_atom, 100 ps"
+    annealing   = off
+    time        = 100
+    timestep    = [0.001 0.001 0.003 ]
+    temperature = 10.0
+    ensemble = {
+        class = "NVT"
+        method = "Brownie"
+        brownie = {
+            delta_max = 0.1
+        }
+    }
+    restrain = {
+        atom = "solute_heavy_atom"
+        force_constant = 50.0
+    }
+}
+simulate {
+    title       = "Brownian Dynamics NVT, T = 10 K, small timesteps, and restraints on user defined sets, ${mintime} ps"
+    annealing   = off
+    time        = ${mintime}
+    timestep    = [0.001 0.001 0.003 ]
+    temperature = 10.0
+    ensemble = {
+        class = "NVT"
+        method = "Brownie"
+        brownie = {
+            delta_max = 0.1
+        }
+        thermostat = {
+            tau = 1.0
+        }
+    }
+    ${constraintDescription}
+}
+simulate {
+    title       = "Langevin small steps NVT, T = 10 K, and restraints on solute heavy atoms, 12 ps"
+    annealing   = off
+    time        = 12
+    timestep    = [0.001 0.001 0.003]
+    temperature = 10.0
+    restrain    = { atom = solute_heavy_atom force_constant = 50.0 }
+    ensemble    = {
+        class  = NVT
+        method = Langevin
+        thermostat.tau = 0.1
+    }
+    randomize_velocity.interval = 1.0
+    eneseq.interval             = 0.3
+    trajectory.center           = []
+}
+simulate {
+    title       = "Langevin NPT, T = 10 K, and restraints on solute heavy atoms, 12 ps"
+    annealing   = off
+    time        = 12
+    temperature = 10.0
+    restrain    = retain
+    ensemble    = {
+        class  = NPT
+        method = Langevin
+        thermostat.tau = 0.1
+        barostat  .tau = 50.0
+    }
+    randomize_velocity.interval = 1.0
+    eneseq.interval             = 0.3
+    trajectory.center           = []
+}
+simulate {
+    title       = "Langevin NPT, T = 10 K, and restraints on solute heavy atoms, 12 ps"
+    time        = 12
+    restrain    = retain
+    ensemble    = {
+        class  = NPT
+        method = Langevin
+        thermostat.tau = 0.1
+        barostat  .tau = 50.0
+    }
+    randomize_velocity.interval = 1.0
+    eneseq.interval             = 0.3
+    trajectory.center           = []
+}
+simulate {
+    title       = "Langevin NPT and no restraints, 24ps"
+    effect_if   = [["@*.*.annealing"] 'annealing = off temperature = "@*.*.temperature[0][0]"']
+    time        = 24
+    ensemble    = {
+        class  = NPT
+        method = Langevin
+        thermostat.tau = 0.1
+        barostat  .tau = 2.0
+    }
+    eneseq.interval   = 0.3
+    trajectory.center = solute
+}
+simulate {
+    title    = "Final MD and analysis, ${mdtime} ps"
+    cfg_file = "plmd.cfg"
+    jobname  = "\$MASTERJOBNAME"
+    dir      = "."
+    compress = ""
+}
+MD1
+if [ "$Analysis"x == "true"x ];then
+cat<<MSJAA >> plmd.msj
+pl_analysis {
+    ligand_asl = "$LigandASL"
+    protein_asl = "$ProteinASL"
+}
+MSJAA
+fi
+}
+
+function help (){
+cat<<HELP
+
+Usage: plmd [OPTION] <parameter>
+
+An automatic Desmond MD pipline for protein-ligand complex MD simulation.
+
+Example: 
+1) plmd -i "*.mae" -S INC -P "chain.name A" -L "res.ptype UNK" -H HPC_CPU -G HPC_GPU
+2) plmd -i "*.mae" -S OUC -P "chain.name A" -L "chain.name B" -t 200 -H HPC_CPU -G HPC_gpu01
+3) plmd -i "*.mae" -S "TIP4P:Cl:0.15-Na-Cl+0.02-Fe2-Cl+0.02-Mg2-Cl" -L "res.num 999" -G HPC_gpu03
+4) plmd -i "*.cms" -P "chain.name A" -L "res.ptype ADP" -H HPC_CPU -G HPC_gpu04
+
+Input parameter:
+  -i	Use a file name (Multiple files are wrapped in "", and split by ' ') *.mae or *.cms ;
+            or regular expression to represent your input file, default is *.mae.
+
+System Builder parameter:
+  -S    System Build Mode: <INC>
+            INC: System in cell, salt buffer is 0.15M KCl, water is TIP3P. Add K to neutralize system.
+            OUC: System out of cell, salt buffer is 0.15M NaCl, water is TIP3P. Add Na to neutralize system.
+            Custom Instruct: Such as: "TIP4P:Cl:0.15-Na-Cl+0.02-Fe2-Cl+0.02-Mg2-Cl"
+                Interactive addition of salt. Add Cl to neutralize system.
+                    for positive_ion: Na, Li, K, Rb, Cs, Fe2, Fe3, Mg2, Ca2, Zn2 are predefined.
+                    for nagative_ion: F, Cl, Br, I are predefined.
+                    for water: SPC, TIP3P, TIP4P, TIP5P, DMSO, METHANOL are predefined.
+
+  -b	Define a boxshape for your systems. <cubic>
+            box types: dodecahedron_hexagon, cubic, orthorhombic, triclinic
+  -s	Define a boxsize for your systems.  <15.0>
+		for dodecahedron_hexagon and cubic, defulat is 15.0;
+		for orthorhombic or triclinic box, defulat is [15.0 15.0 15.0];
+		If you want use Orthorhombic or Triclinic box, your parameter should be like "15.0 15.0 15.0"
+  -R    Redistribute the mass of heavy atoms to bonded hydrogen atoms to slow-down high frequency motions.
+  -F	Define a force field to build your systems. <OPLS_2005>
+		OPLS_2005, S-OPLS, OPLS3e, OPLS3, OPLS2 are recommended to protein-ligand systems.
+
+Simulation control parameter:
+  -m	Enter the maximum simulation time for the Brownian motion simulation, in ps. <100>
+  -t    Enter the Molecular dynamics simulation time for the product simulation, in ns. <100>
+  -T    Specify the temperature to be used, in kelvin. <310>
+  -N    Number of Repeat simulation with different random numbers. <1>
+  -P    Define a ASL to protein, such as "protein".
+  -L    Define a ASL to ligand, such as "res.ptype UNK".
+  -q    Turn off protein-ligand analysis.
+  -u    Turn off md simulation, only system build.
+  -C    Set constraint to an ASL, such as "chain.name A AND backbone"
+  -f    Set constraint force, default is 10.
+  -o    Specify the approximate number of frames in the trajectory.  <1000>
+        This value is coupled with the recording interval for the trajectory and the simulation time: the number of frames times the trajectory recording interval is the total simulation time.
+        If you adjust the number of frames, the recording interval will be modified.
+
+Job control:
+  -G	HOST of GPU queue, default is HPC_GPU.
+  -H    HOST of CPU queue, default is HPC_CPU.
+  -D	Your Desmond path. <$Desmond>
+
+Thank you for your using, If you found any question, Please contact wanglin3@shanghaitech.edu.cn.
+HELP
+}
+#Default
+    # MD system build
+    export System_Mode="INC"
+    export negaion='Cl'
+    export solvent="TIP3P"
+    export rezerosys=true
+    export minisys=true
+    export boxshape=cubic
+    export boxsize=15.0
+    export position=Na
+    export ffid=OPLS_2005
+    export NeorPo=false
+    export saltconcentration=0.15
+    export hydrogen_mass_repartition=false
+    
+    # MD params
+    export mintime=100
+    export mdtime=100000.0
+    export num=1
+    export temperature=310
+    export frames=1000
+    export Analysis=true
+    export trunoff_md=false
+    export ProteinASL="protein"
+    export LigandASL="res.ptype UNK"
+    export constraint=false
+    export constraintASL="chain.name A AND backbone"
+    export constraintForce=10
+
+    # File and Host
+    export input=*.mae
+    export CPU_HOST=HPC_CPU
+    export GPU_HOST=HPC_GPU
+
+    # Desmond
+    export Desmond=${Desmond}
+
+while getopts ":hi:S:nb:s:RF:m:t:T:N:P:L:C:f:o:H:G:D:qu" opt
+do
+  case $opt in
+    h)
+        help
+        exit;;
+    i)
+        input=$OPTARG;;
+    S)
+        System_Mode=$OPTARG;;
+    s)
+        boxsize=$OPTARG
+        boxxyz=${boxsize}
+        ;;
+    b)
+        boxshape=$OPTARG;;
+    m)
+        mintime=$OPTARG;;
+    R)
+        hydrogen_mass_repartition=true;;
+    H)
+        CPU_HOST=$OPTARG;;
+    G)
+        GPU_HOST=$OPTARG;;
+    D)
+        Desmond=$OPTARG;;
+    c)
+        saltconcentration=$OPTARG;;
+    f)
+        constraint=true
+        constraintForce=$OPTARG
+        ;;
+    C)
+        constraint=true
+        constraintASL=$OPTARG
+        ;;
+    t)
+        mdtime=`echo "${OPTARG} * 1000.0"|bc`;;
+    N)
+        num=$OPTARG;;
+    q)
+        Analysis=false;;
+    P)
+        ProteinASL=$OPTARG
+        ;;
+    L)
+        LigandASL=$OPTARG
+        ;;
+    T)
+        temperature=$OPTARG;;
+    o)
+        frames=$OPTARG;;
+    F)
+        ffid=$OPTARG;;
+    u)
+        trunoff_md=true;;
+    ?)
+      echo ""
+      echo "Error: Do not use undefined options. Try -h."
+      echo ""
+      exit;;
+  esac
+done
+
+# Check Desmond and hostfile
+if [ -d ${Desmond} ];then
+  if [ "${Desmond}" == "" ];then
+    echo "Desmond not found. Please check your Desmond Path."
+    exit
+  fi
+  if [ "`grep -c $CPU_HOST ${Desmond}/schrodinger.hosts`" == "0" ];then
+    echo $CPU_HOST "Hostfile not found."
+    exit
+  fi
+  if [ "`grep -c $GPU_HOST ${Desmond}/schrodinger.hosts`" == "0" ];then
+    echo $GPU_HOST "Hostfile not found."
+    exit
+  fi
+else
+  echo "Desmond not found. Please check your Desmond Path."
+  exit
+fi
+
+# box type and size
+if [ "${boxshape}"x == "orthorhombic"x ];then
+  boxsize="[${boxxyz} ]"
+elif [ "${boxshape}"x == "triclinic"x ];then
+  boxsize="[${boxxyz} 60.0 60.0 60.0 ]"
+else
+  boxsize=${boxsize}
+fi
+
+# MD basic control
+seedlist=()
+if [ ${num} -gt 3 ];then
+    read -p "Do you really want to run more than three random simulations? Make sure you have adequate resources. Press Enter to continue and enter NO to exit!" makesure
+    if [ "$makesure" == "NO" ];then
+        echo "This is really a wise choice!"
+        exit
+    else
+        echo "Your system will perform ${num} simulations at different random speeds."
+        for i in $(seq 1 ${num});do
+        seedlist+=("$RANDOM");done
+    fi
+elif [ "${num}" == "1" ];then
+        seedlist=(2007)
+        echo "Your system will only perform one simulation."
+else
+    echo "Your system will perform ${num} simulations at different random speeds."
+    for i in $(seq 1 ${num});do
+    seedlist+=("$RANDOM");done
+fi
+
+#check params
+fflist=("OPLS_2005" "OPLS3e" "OPLS4" "OPLS3" "OPLS2" "amber99SB-ILDN" "amber03" "amber99" "amber99SB" "charmm32" "charmm36_lipids" "S-OPLS")
+nagativeionlist=("F" "Cl" "Br" "I")
+positiveionlist=("Na" "K" "Li" "Rb" "Cs" "Mg2" "Ca2" "Zn2" "Fe2" "Fe3")
+all_ions_list=("F" "Cl" "Br" "I" "Na" "K" "Li" "Rb" "Cs" "Mg2" "Ca2" "Zn2" "Fe2" "Fe3")
+solventlist=("SPC" "TIP3P" "TIP4P" "TIP5P" "DMSO" "METHANOL")
+boxlist=("orthorhombic" "triclinic" "dodecahedron_hexagon" "cubic")
+waterlist=("SPC" "TIP3P" "TIP4P" "TIP5P")
+first_input="yes"
+[ ${first_input} == "no" ] || checkparam $ffid "${fflist[*]}"
+[ ${first_input} == "no" ] || checkparam $boxshape "${boxlist[*]}"
+
+# Parse params
+if [ "$constraint"x == "true"x ];then
+    constraintDescription="restrain = {atom = \"asl:${constraintASL}\" force_constant = ${constraintForce}}"
+else
+    constraintDescription="restrain = none"
+fi
+
+if [ ${ffid:0:4} == "OPLS" ] || [ ${ffid} == "S-OPLS" ]; then
+    override_forcefield=${ffid}
+else
+    override_forcefield="OPLS_2005"
+fi
+
+for line in ${waterlist[@]}; do
+if [ "$solvent" == "$line" ];then
+  water="water = ${solvent}"
+  break
+fi; done
+
+# report MD information
+cat<<OUT
+
+Jobs will run at ${GPU_HOST};
+
+Your MD information is as follows:
+
+MIN time: ${mintime} ps
+MD time: ${mdtime} ps
+temperature: ${Temperature} K
+Repeat: ${num}
+Rondom numbers list: ${seedlist[@]}
+
+OUT
+
+# Check input file
+if ls $input >/dev/null 2>&1;then
+  echo "These mae/cms files will be processed:"
+  for i in `ls $input`; do echo $i;done
+else
+  echo "Error: mae/cms file not found, please check it."
+  exit
+fi
+echo ""
+
+for i in `ls $input`; do
+    first_input="no"
+    for seed in ${seedlist[@]};do
+        if [ -d ${i%%.*}-${seed}-md ];then
+            rm -r ${i%%.*}-${seed}-md
+            echo "Remove all old files in ${i%%.*}-${seed}-md."
+            mkdir -p ${i%%.*}-${seed}-md
+        else
+            mkdir -p ${i%%.*}-${seed}-md
+        fi
+        cd ${i%%.*}-${seed}-md
+        gen_cfg
+cat<<MSJ1 > plmd.msj
+task {
+  task = "desmond:auto"
+  set_family = {
+    simulate = {
+    checkpt.write_last_step = no
+    }
+  }
+}
+MSJ1
+        if [ ${i##*.} == cms ]; then
+            echo "Put the ${i} to MD simulation."
+        elif [ ${i##*.} == mae ];then
+            echo "Put the ${i} to MD simulation."
+            if [ $System_Mode == "INC" ];then
+                SYS_pipeline="TIP3P:K:0.15-K-Cl"
+            elif [ $System_Mode == "OUC" ];then
+                SYS_pipeline="TIP3P:Na:0.15-Na-Cl"
+            else
+                SYS_pipeline=$System_Mode
+            fi
+            sys_build
+        else
+            continue
+        fi
+        if [ $trunoff_md == true ]; then
+            echo "Note: You turn off the MD simulations!"
+        else
+            set_md
+        fi
+        $Desmond/utilities/multisim -JOBNAME ${i%%.*}-${seed}-md -HOST "${CPU_HOST}:3" -SUBHOST ${GPU_HOST} -maxjob 0 -m plmd.msj -c plmd.cfg -lic DESMOND_ACADEMIC:16 -o ../${i%%.*}-${seed}-md-out.cms ../$i
+        cd ..
+        date
+        echo "MD system ${i%%.*} with seed ${seed} had been submitted to $GPU_HOST."
+    done
+done
+
+cat<<FF
+
+All jobs are running!
+Thank you for your using, If you found any question, Please contact wanglin3@shanghaitech.edu.cn.
+
+FF
+
