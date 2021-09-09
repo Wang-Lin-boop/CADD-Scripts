@@ -1,6 +1,6 @@
 #!/bin/bash
 #########################################################################
-# GVSrun, Version 1.2.0
+# GVSrun, Version 1.2.1
 # 2021, ShanghaiTech University, Wang Lin
 # Email: wanglin3@shanghaitech.edu.cn
 #########################################################################
@@ -429,7 +429,7 @@ SETDB
         echo "  FILE   ${Database}" >> ${Inp_Name}
     elif [ ${Database_Location##*.} == "mae" ] || [ ${Database_Location##*.} == "maegz" ] || [ ${Database_Location##*.} == "sdf" ] || [ ${Database_Location##*.} == "smi" ];then
         echo "  VARCLASS    Structures" >> ${Inp_Name}
-        echo "  FILE   ${Database_Location}" >> ${Inp_Name}
+        echo "  FILE   ${Database_Location}," >> ${Inp_Name}
     elif [ -f ${Database_Location}/*.phdb ];then
         phdb_name=`ls ${Database_Location}/*.phdb | awk '{ORS=","}''{print}'`
         echo "  VARCLASS    PhaseDB" >> ${Inp_Name}
