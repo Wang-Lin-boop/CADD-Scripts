@@ -1,6 +1,6 @@
 #!/bin/bash
 #########################################################################
-# XDock, Version 1.2.0
+# XDock, Version 1.2.1
 # 2021, ShanghaiTech University, Wang Lin
 # Email: wanglin3@shanghaitech.edu.cn
 #########################################################################
@@ -104,6 +104,7 @@ XDock control parameter:
             fine: Delete and re-add hydrogens, and generate het group states with Epik.
             hopt: fine + optimize H-bond networks.
             mini: hopt + constrained minimaztion.
+                if return a error "File does not exist" after preparation, comment "sys.exit(1)" in $SCHRODINGER/mmshare-v5.5/python/common/xglide.py at 1411 line.
   -m    XDock Mode: <SITEMAP>
             SITEMAP: Only protein pocket identifed by SiteMap, SP Docking.
                 Change the number of Grid files per protein generated using Sitemap by "-s <num>", default is 2.
