@@ -1,6 +1,6 @@
 #!/bin/bash
 #########################################################################
-# XDock, Version 1.2.1
+# XDock, Version 1.2.2
 # 2021, ShanghaiTech University, Wang Lin
 # Email: wanglin3@shanghaitech.edu.cn
 #########################################################################
@@ -183,7 +183,6 @@ do
         ProPrep=$OPTARG;;
     m)
         Mode=$OPTARG
-        ProPrep="none"
         ;;
     v)
         scalingVdW=$OPTARG;;
