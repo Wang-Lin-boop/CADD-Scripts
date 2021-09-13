@@ -1,6 +1,6 @@
 #!/bin/bash
 #########################################################################
-# XDock, Version 1.2.2
+# XDock, Version 1.2.4
 # 2021, ShanghaiTech University, Wang Lin
 # Email: wanglin3@shanghaitech.edu.cn
 #########################################################################
@@ -104,7 +104,7 @@ XDock control parameter:
             fine: Delete and re-add hydrogens, and generate het group states with Epik.
             hopt: fine + optimize H-bond networks.
             mini: hopt + constrained minimaztion.
-                if return a error "File does not exist" after preparation, comment "sys.exit(1)" in $SCHRODINGER/mmshare-v5.5/python/common/xglide.py at 1411 line.
+        NOTE: if return a error "File does not exist" after preparation, replace "sys.exit(1)" in $SCHRODINGER/mmshare-v5.5/python/common/xglide.py at 1411 line to "continue".
   -m    XDock Mode: <SITEMAP>
             SITEMAP: Only protein pocket identifed by SiteMap, SP Docking.
                 Change the number of Grid files per protein generated using Sitemap by "-s <num>", default is 2.
@@ -137,6 +137,7 @@ XDock control parameter:
         The grid size will be the sum of the inner box size (default 12), the computed max ligand size, and the box outer buffer.
 
 Job control:
+  -T    Set a Job Title. <Mode>
   -H	Hostname of your queue, defult is HPC_CPU.
   -N    The number of threads you want to use in this task. No more than 100. <50>
   -r    The number of Prime License you had. <10>
@@ -149,7 +150,7 @@ Thank you for your using, If you found any problem, Please contact wanglin3@shan
 HELP
 }
 
-while getopts ":hP:L:l:p:H:N:S:g:s:m:n:o:x:A:F:D:r:R:B:ev:tV:d:b:i:" opt
+while getopts ":hP:L:l:p:H:N:S:g:s:m:n:o:x:A:F:D:r:R:B:ev:tV:d:b:i:T:" opt
 do
   case $opt in
     h)
@@ -182,8 +183,7 @@ do
     p)
         ProPrep=$OPTARG;;
     m)
-        Mode=$OPTARG
-        ;;
+        Mode=$OPTARG;;
     v)
         scalingVdW=$OPTARG;;
     i)
@@ -213,6 +213,8 @@ do
         MAXKEEP=15000;;
     t)
         Peptide_docking=true;;
+    T)
+        Job_Title=$OPTARG;;
     ?)
         echo ""
         echo "Error: Do not use undefined options."
@@ -260,7 +262,7 @@ Mode: ${Mode}
 
 Inputted Proteins: ${Protein_Input}
 Inputted Ligands: ${Ligand_Input}
-Protein Preparation: ${ProPrep} by ${Rosetta_Jd2_or_Schrodinger}
+Protein Preparation: ${ProPrep}
 SiteMap: ${Site_Num}
 Flexible Docking: ${Docking}
 Induce Fit Docking: ${Induce_Fit}
@@ -496,41 +498,44 @@ fi
 mkdir -p ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input})
 Job_Dir=${PWD}
 cd ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input})
+if [ ! ${Job_Title} ];then
+    Job_Title=${Mode}
+fi
 
 # Xglide Module
 if [ $Xglide == "true" ];then
 
-cat<<INP0 > Xglide-${Mode}.inp
+cat<<INP0 > ${Job_Title}.inp
 #Job Dic.: ${Job_Dir}
 #Protein Lib: ${Protein_to_DOCK}
 #Ligand Input: ${Ligand_Input}
 INP0
 
 if [ $By_Complex == "true" ];then
-    echo "COMPLEX       ${Protein_to_DOCK}" >> Xglide-${Mode}.inp
+    echo "COMPLEX       ${Protein_to_DOCK}" >>  ${Job_Title}.inp
 fi
 
 if [ $By_SiteMap == "true" ];then
-    echo "RECEPTOR       ${Protein_to_DOCK}" >> Xglide-${Mode}.inp
-    echo "SITEMAP       TRUE" >> Xglide-${Mode}.inp
-    echo "SITEMAP_MAXSITES      ${Site_Num}" >> Xglide-${Mode}.inp
-    echo "GRIDGEN_GRID_CENTER      SELF" >> Xglide-${Mode}.inp
-    echo "SITEMAP_FORCE       TRUE" >> Xglide-${Mode}.inp
-    echo "GRIDGEN_OUTERBOX       SELF" >> Xglide-${Mode}.inp
+    echo "RECEPTOR       ${Protein_to_DOCK}" >>  ${Job_Title}.inp
+    echo "SITEMAP       TRUE" >>  ${Job_Title}.inp
+    echo "SITEMAP_MAXSITES      ${Site_Num}" >>  ${Job_Title}.inp
+    echo "GRIDGEN_GRID_CENTER      SELF" >>  ${Job_Title}.inp
+    echo "SITEMAP_FORCE       TRUE" >>  ${Job_Title}.inp
+    echo "GRIDGEN_OUTERBOX       SELF" >>  ${Job_Title}.inp
 fi
 
 if [ $By_Center == "true" ];then
-    echo "RECEPTOR       ${Protein_to_DOCK}" >> Xglide-${Mode}.inp
-    echo "SITEMAP       FALSE" >> Xglide-${Mode}.inp
-    echo "GRIDGEN_GRID_CENTER      ${Grid_Center}" >> Xglide-${Mode}.inp
+    echo "RECEPTOR       ${Protein_to_DOCK}" >>  ${Job_Title}.inp
+    echo "SITEMAP       FALSE" >>  ${Job_Title}.inp
+    echo "GRIDGEN_GRID_CENTER      ${Grid_Center}" >>  ${Job_Title}.inp
 fi
 
 if [ $Grid_in == "true" ];then
     for grd in `ls ${Protein_to_DOCK} | grep "grd$|zip$"`;do
-        echo "GRID      ${grd},-1" >> Xglide-${Mode}.inp
+        echo "GRID      ${grd},-1" >>  ${Job_Title}.inp
     done 
 else
-cat<<INP1 >> Xglide-${Mode}.inp
+cat<<INP1 >>  ${Job_Title}.inp
 PPREP       ${PPREP}
 PPREP_REHTREAT      ${PPREP_REHTREAT}
 PPREP_EPIK      ${PPREP_EPIK}
@@ -547,7 +552,7 @@ INP1
 fi
 
 if [ $Docking == "true" ];then
-cat<<INP2 >> Xglide-${Mode}.inp
+cat<<INP2 >>  ${Job_Title}.inp
 LIGAND      ${Ligand_Input}
 MAXLIGATOMS     300
 LIGPREP     ${LIGPREP}
@@ -562,7 +567,7 @@ DOCK_MAXKEEP    ${MAXKEEP}
 DOCK_PEPTIDE    ${Peptide_docking}
 INP2
 elif [ $Docking == "false"];then
-    echo "SKIP_DOCKING      TRUE" >> Xglide-${Mode}.inp
+    echo "SKIP_DOCKING      TRUE" >>  ${Job_Title}.inp
 else
     echo "Unkown Error, Please contact wanglin3@shanghaitech.edu.cn."
     exit
@@ -571,9 +576,9 @@ fi
 echo "Submitting Flexible Docking Jobs......"
 echo ""
 if [ $HOST == "localhost" ]; then
-    ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST localhost -WAIT -TMPLAUNCHDIR -OVERWRITE Xglide-${Mode}.inp  
+    ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST localhost -WAIT -TMPLAUNCHDIR -OVERWRITE  ${Job_Title}.inp  
 else
-    ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -TMPLAUNCHDIR -OVERWRITE Xglide-${Mode}.inp  
+    ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -TMPLAUNCHDIR -OVERWRITE  ${Job_Title}.inp  
 fi
 
 fi && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!" # Xglide Module
@@ -592,17 +597,17 @@ if [ "$Induce_Fit"x == "true"x ];then
     else
         echo "Induce Fit Docking cannot to using SiteMap."
     fi 
-cat<<IFT1 > IFT-${Mode}.inp
+cat<<IFT1 >  ${Job_Title}.inp
 INPUT_FILE  Proteins_to_InduceFitDock.maegz
 IFT1
 
 if [ $ProPrep == "true" ];then
     echo "STAGE PPREP
     RMSD    0.5
-    " >>  IFT-${Mode}.inp
+    " >>   ${Job_Title}.inp
 fi
 
-cat<<IFT2 >> IFT-${Mode}.inp
+cat<<IFT2 >>  ${Job_Title}.inp
 STAGE VDW_SCALING
   BINDING_SITE ${BINDING_SITE}
 
@@ -659,16 +664,16 @@ IFT2
 echo "Submitting Induce Fit Docking Jobs......"
 echo ""
 if [ $HOST == "localhost" ]; then
-    ${SCHRODINGER}/ifd -NGLIDECPU ${Njobs} -NPRIMECPU ${Prime} IFT-${Mode}.inp -HOST localhost -TMPLAUNCHDIR -WAIT
+    ${SCHRODINGER}/ifd -NGLIDECPU ${Njobs} -NPRIMECPU ${Prime}  ${Job_Title}.inp -HOST localhost -TMPLAUNCHDIR -WAIT
 else
-    ${SCHRODINGER}/ifd -NGLIDECPU ${Njobs} -NPRIMECPU ${Prime} IFT-${Mode}.inp -NOLOCAL -HOST ${HOST} -SUBHOST ${HOST} -TMPLAUNCHDIR
+    ${SCHRODINGER}/ifd -NGLIDECPU ${Njobs} -NPRIMECPU ${Prime}  ${Job_Title}.inp -NOLOCAL -HOST ${HOST} -SUBHOST ${HOST} -TMPLAUNCHDIR
 fi
 
 fi && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!" # Induce Fit Module
 
 if [ "$Native"x == "true"x ];then
 
-cat<<INP0 > Redock-${Mode}.inp
+cat<<INP0 >  ${Job_Title}.inp
 #Job Dic.: ${Job_Dir}
 #Protein Lib: ${Protein_to_DOCK}
 COMPLEX         ${Protein_to_DOCK}
@@ -683,9 +688,9 @@ INP0
 echo "Submitting Native re-docking Jobs......"
 echo ""
 if [ $HOST == "localhost" ]; then
-    ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST localhost -WAIT -TMPLAUNCHDIR -OVERWRITE Redock-${Mode}.inp
+    ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST localhost -WAIT -TMPLAUNCHDIR -OVERWRITE  ${Job_Title}.inp
 else
-    ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -TMPLAUNCHDIR -OVERWRITE Redock-${Mode}.inp  
+    ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -TMPLAUNCHDIR -OVERWRITE  ${Job_Title}.inp  
 fi
 
 fi && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!" # Native redock
