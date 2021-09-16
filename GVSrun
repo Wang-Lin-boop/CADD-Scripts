@@ -1,6 +1,6 @@
 #!/bin/bash
 #########################################################################
-# GVSrun, Version 1.2.1
+# GVSrun, Version 1.3.0
 # 2021, ShanghaiTech University, Wang Lin
 # Email: wanglin3@shanghaitech.edu.cn
 #########################################################################
@@ -123,7 +123,9 @@ These options are supported by this script.
             Combine_CONFGEN: Preform ConfSearch with two user defined force field and MMFFs.
 
         @Screening: Reduce the number of compounds rough docking. Related to -a option.
-            Shape: Shape Screening, NOTE: Must be the first in the pipeline.
+            Shape: Shape Screening using external app, taken together with the local mode!
+                    NOTE: Must be the first in the pipeline. 
+            PhaseShape: Shape Screening in pipeline. 
             HTVS_Normal: The standard HTVS screening.
             HTVS_Rough: The reduced HTVS screening, The sample size is reduced to nearly half of the HTVS_Normal.
             HTVS_Fragment: It is suitable for rapid screening of compound fragments.
@@ -219,7 +221,7 @@ Control parameters:
             Other QM setting: "B3LYP-D3M(BJ):6-311G+**","M06‑2X:def2-tzvpp(-g)","wB97M‑V:cc-pVTZ-pp"
   -p    PH for ligPrep, with ±2.0. <7.0>
   -s    Set a SMARTs Expression for compounds filter at first step. such as [B]([O])[O].
-  -E    Perform Shape Screening at first, Taken together with the local mode! <10000:mmod:rapid:1000>
+  -E    Shape Screening Options. <10000:mmod:rapid:1000>
             The paramter means: "keep_num:atomtypes:shape_sample_method:max_confs";
             NOTE: element and qsar are alternative atomtypes; thorough are alternative shape_sample_method.
 
@@ -2783,6 +2785,30 @@ cat<<RMSD >>${Inp_Name}
     STRUCTOUT   RMSD_OUT
 RMSD
     Ligand_name="RMSD_OUT"
+}
+
+PhaseShape(){
+    TO_RMSD="${Ligand_name}"
+    keep_num=${shape_screen_Array[0]}
+    atomtypes=${shape_screen_Array[1]}
+    shape_sample_method=${shape_screen_Array[2]}
+    max_confs=${shape_screen_Array[3]}
+cat<<Shape >>${Inp_Name}
+[STAGE:PhaseShape]
+    STAGECLASS  phase.PhaseShapeStage
+    INPUT   ${Ligand_name}
+    OUTPUTS   Shape_OUT
+    ATOM_TYPES  ${atomtypes}
+    MAX_CONFS   ${max_confs}
+    EXISTING_CONFS  keep
+    CONFS_PER_BOND  12
+    AMIDE_MODE  trans
+[USEROUTS:$task]
+    USEROUTS   Shape_OUT,
+    STRUCTOUT   Shape_OUT
+Shape
+    Ligand_name="Shape_OUT"
+    echo "NOTE: Shape Sreening in Pipeline!"
 }
 
 Shape(){
