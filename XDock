@@ -1,6 +1,6 @@
 #!/bin/bash
 #########################################################################
-# XDock, Version 1.2.4
+# XDock, Version 1.3.0
 # 2021, ShanghaiTech University, Wang Lin
 # Email: wanglin3@shanghaitech.edu.cn
 #########################################################################
@@ -48,8 +48,8 @@
     Peptide_docking=false
     rosetta_version=mpi
 
-    Mode_List=("Normal" "Grid" "COMPD" "COMPI" "SITEMAP" "GCD" "GCI")
     VAILD_PRECISION=("SP" "XP" "HTVS")
+    VAILD_FF=("OPLS4" "OPLS3e" "OPLS3" "OPLS_2005")
 
     #Host and Schrodinger Path
     HOST=HPC_CPU
@@ -129,7 +129,7 @@ XDock control parameter:
   -x    The PRECISION of Docking, SP, XP and HTVS are supported. Default is SP.
   -A    Reference Ligand ASL to induce Fit Docking. Such as: "A:999"
   -D    residues within the specified distance will be set to flexible in Induce Fit Docking. default is 5.0 Å.
-  -F    Force Field in Induce Fit Docking, OPLS_2005, OPLS3e or OPLS4.
+  -F    Force Field in Docking, OPLS_2005, OPLS3e or OPLS4.
   -e    Enchanced Sampling.
   -t    Peptide docking, if your ligands is peptides, please use -t. Default is turn off.
   -i    Inner Box size. The space for ligand centroid motion. <12>
@@ -253,7 +253,7 @@ else
 fi
 }
 testarray $PRECISION "${VAILD_PRECISION[*]}"
-testarray $Mode "${Mode_List[*]}"
+testarray $Force_Field "${VAILD_FF[*]}"
 
 cat<<OUTPUTLOG
 XDock Workflow Parameter:
@@ -491,7 +491,7 @@ elif [ $Mode == "Native" ];then
     Xglide=false
     Induce_Fit=false
 else
-    echo "Unkown Error, Please contact wanglin3@shanghaitech.edu.cn."
+    echo "Unkown Mode, Please contact wanglin3@shanghaitech.edu.cn."
     exit
 fi
 
@@ -544,29 +544,31 @@ PPREP_PROTASSIGN_EXHAUSTIVE     ${PPREP_PROTASSIGN_EXHAUSTIVE}
 PPREP_IMPREF        ${PPREP_IMPREF}
 PPREP_IMPREF_RMSD   ${PPREP_IMPREF_RMSD}
 PPREP_WATERDIST     ${PPREP_WATERDIST}
+LIGAND      ${Ligand_Input}
+MAXLIGATOMS     300
+LIGPREP     ${LIGPREP}
+LIGPREP_EPIK    ${LIGPREP_EPIK}
 GRIDGEN_INNERBOX        ${box_inner}
 GRIDGEN_OUTERBOX_BUFFER     ${Box_Buffer}
 GRIDGEN_RECEP_VSCALE    ${scalingVdW}
 GRIDGEN_PEPTIDE     ${Peptide_docking}
+GRIDGEN_FORCEFIELD      ${Force_Field}
 INP1
 fi
 
 if [ $Docking == "true" ];then
 cat<<INP2 >>  ${Job_Title}.inp
-LIGAND      ${Ligand_Input}
-MAXLIGATOMS     300
-LIGPREP     ${LIGPREP}
-LIGPREP_EPIK    ${LIGPREP_EPIK}
 DOCK_PRECISION      ${PRECISION}
 DOCK_LIG_VSCALE     ${scalingVdW}
 DOCK_POSES_PER_LIG      ${Pose_Num}
 DOCK_POSE_OUTTYPE       poseviewer
 GENERATE_TOP_COMPLEXES      ${OUT_com}
 DOCK_NENHANCED_SAMPLING     ${SAMPLING}
+DOCK_FORCEFIELD      ${Force_Field}
 DOCK_MAXKEEP    ${MAXKEEP}
 DOCK_PEPTIDE    ${Peptide_docking}
 INP2
-elif [ $Docking == "false"];then
+elif [ $Docking == "false" ];then
     echo "SKIP_DOCKING      TRUE" >>  ${Job_Title}.inp
 else
     echo "Unkown Error, Please contact wanglin3@shanghaitech.edu.cn."
