@@ -1,6 +1,6 @@
 #!/bin/bash
 #########################################################################
-# GVSrun, Version 1.3.0
+# GVSrun, Version 1.4.1
 # 2021, ShanghaiTech University, Wang Lin
 # Email: wanglin3@shanghaitech.edu.cn
 #########################################################################
@@ -29,11 +29,11 @@
     MACROMODEL=10
 
     #INPUT
-    input=*.zip
+    input=None
     Running_Mode="Fast"
 
     #Setting
-    PH=7.0
+    PH=7.0:2.0
     Dock_out_conf=1
     HTVS_out_num="5%"
     Docking_out_num="4000"
@@ -219,7 +219,7 @@ Control parameters:
             The cys is residue name for A:1425, Supported residues: cys, ser, lys.
   -q    Define a "DFT:Basis_Set" to QM/QMMM, default is "B3LYP-D3(BJ):6-311G**".
             Other QM setting: "B3LYP-D3M(BJ):6-311G+**","M06‑2X:def2-tzvpp(-g)","wB97M‑V:cc-pVTZ-pp"
-  -p    PH for ligPrep, with ±2.0. <7.0>
+  -p    set a PH:PHT for ligPrep, default is 7.0:2.0, means 7.0±2.0. <7.0:2.0>
   -s    Set a SMARTs Expression for compounds filter at first step. such as [B]([O])[O].
   -E    Shape Screening Options. <10000:mmod:rapid:1000>
             The paramter means: "keep_num:atomtypes:shape_sample_method:max_confs";
@@ -431,7 +431,7 @@ SETDB
         echo "  FILE   ${Database}" >> ${Inp_Name}
     elif [ ${Database_Location##*.} == "mae" ] || [ ${Database_Location##*.} == "maegz" ] || [ ${Database_Location##*.} == "sdf" ] || [ ${Database_Location##*.} == "smi" ];then
         echo "  VARCLASS    Structures" >> ${Inp_Name}
-        echo "  FILE   ${Database_Location}, " >> ${Inp_Name}
+        echo "  FILES   ${Database_Location}, " >> ${Inp_Name}
     elif [ -f ${Database_Location}/*.phdb ];then
         phdb_name=`ls ${Database_Location}/*.phdb | awk '{ORS=","}''{print}'`
         echo "  VARCLASS    PhaseDB" >> ${Inp_Name}
@@ -668,7 +668,6 @@ cat<<No_Dup >> ${Inp_Name}
     MERGE_PROPS   YES
     OUTFORMAT   sdf
     NEUTRALIZE  YES
-    DESALT  YES
 No_Dup
     Ligand_name="No_Dup_OUT"
 }
@@ -713,22 +712,13 @@ Warhead
 }
 
 IONIZE(){
+    PH_array=(${PH//:/ })
+    PH_value=${PH_array[0]}
+    PHT=${PH_array[1]}
 cat<<IONIZE >> ${Inp_Name}
-[STAGE:PRE_IONIZE]
-    STAGECLASS   gencodes.RecombineStage
-    INPUTS   ${Ligand_name},
-    OUTPUTS   PRE_IONIZE_RECOMBINE_OUT,
-    NUMOUT   njobs
-    OUTFORMAT   maegz
-    MIN_SUBJOB_STS   4000
-    MAX_SUBJOB_STS   40000
-    GENCODES   YES
-    OUTCOMPOUNDFIELD   s_vsw_compound_code
-    OUTVARIANTFIELD   s_vsw_variant
-    UNIQUEFIELD   s_m_title
 [STAGE:IONIZE]
     STAGECLASS   ligprep.LigPrepStage
-    INPUTS    PRE_IONIZE_RECOMBINE_OUT,
+    INPUTS    ${Ligand_name},
     OUTPUTS   IONIZE_OUT,
     RECOMBINE   YES
     MIXLIGS   YES
@@ -736,41 +726,37 @@ cat<<IONIZE >> ${Inp_Name}
     UNIQUEFIELD   s_m_title
     OUTCOMPOUNDFIELD   s_vsw_compound_code
     USE_EPIK   False
-    PH   ${PH}
-    PHT   2.0
+    PH   ${PH_value}
+    PHT  ${PHT}
     MAX_TAUTOMERS   4
     NRINGCONFS   3
-    COMBINEOUTS   NO
+    COMBINEOUTS   YES
     IONIZE  YES
     STEREO_SOURCE   parities
     NUM_STEREOISOMERS   16
     MAX_STEREOISOMERS   8
     REGULARIZE   NO
+[STAGE:POSTLIGPREP]
+    STAGECLASS   ligprep.PostLigPrepStage
+    INPUTS   IONIZE_OUT,
+    OUTPUTS   POSTIONIZE_OUT,
+    UNIQUEFIELD   s_vsw_compound_code
+    OUTVARIANTFIELD   s_vsw_variant
+    PRESERVE_NJOBS   YES
+    REMOVE_PENALIZED_STATES   YES
 [USEROUTS:$task]
-    USEROUTS   IONIZE_OUT,
-    STRUCTOUT   IONIZE_OUT
+    USEROUTS   POSTIONIZE_OUT,
+    STRUCTOUT   POSTIONIZE_OUT
 IONIZE
-    Ligand_name="IONIZE_OUT"
+    Ligand_name="POSTIONIZE_OUT"
     TO_RMSD="${Ligand_name}"
 }
 
 EPIK4(){
 cat<<EPIK4 >> ${Inp_Name}
-[STAGE:PRE_EPIK4]
-    STAGECLASS   gencodes.RecombineStage
-    INPUTS   ${Ligand_name},
-    OUTPUTS   PRE_EPIK4_RECOMBINE_OUT,
-    NUMOUT   njobs
-    OUTFORMAT   maegz
-    MIN_SUBJOB_STS   4000
-    MAX_SUBJOB_STS   40000
-    GENCODES   YES
-    OUTCOMPOUNDFIELD   s_vsw_compound_code
-    OUTVARIANTFIELD   s_vsw_variant
-    UNIQUEFIELD   s_m_title
 [STAGE:EPIK4]
     STAGECLASS   ligprep.LigPrepStage
-    INPUTS    PRE_EPIK4_RECOMBINE_OUT,
+    INPUTS    ${Ligand_name},
     OUTPUTS   EPIK4_OUT,
     RECOMBINE   YES
     RETITLE   YES
@@ -781,40 +767,36 @@ cat<<EPIK4 >> ${Inp_Name}
     USE_EPIK   YES
     MAX_STATES  8
     METAL_BINDING   NO
-    PH   ${PH}
-    PHT   2.0
+    PH   ${PH_value}
+    PHT  ${PHT}
     MAX_TAUTOMERS   4
     NRINGCONFS   4
-    COMBINEOUTS   NO
+    COMBINEOUTS   YES
     STEREO_SOURCE   parities
     NUM_STEREOISOMERS   16
     MAX_STEREOISOMERS   4
     REGULARIZE   NO
+[STAGE:POSTLIGPREP]
+    STAGECLASS   ligprep.PostLigPrepStage
+    INPUTS   EPIK4_OUT,
+    OUTPUTS   POSTEPIK4_OUT,
+    UNIQUEFIELD   s_vsw_compound_code
+    OUTVARIANTFIELD   s_vsw_variant
+    PRESERVE_NJOBS   YES
+    REMOVE_PENALIZED_STATES   YES
 [USEROUTS:$task]
-    USEROUTS   EPIK4_OUT,
-    STRUCTOUT   EPIK4_OUT
+    USEROUTS   POSTEPIK4_OUT,
+    STRUCTOUT   POSTEPIK4_OUT
 EPIK4
-    Ligand_name="EPIK4_OUT"
+    Ligand_name="POSTEPIK4_OUT"
     TO_RMSD="${Ligand_name}"
 }
 
 EPIK32(){
 cat<<EPIK32 >> ${Inp_Name}
-[STAGE:PRE_EPIK32]
-    STAGECLASS   gencodes.RecombineStage
-    INPUTS   ${Ligand_name},
-    OUTPUTS   PRE_EPIK32_RECOMBINE_OUT,
-    NUMOUT   njobs
-    OUTFORMAT   maegz
-    MIN_SUBJOB_STS   4000
-    MAX_SUBJOB_STS   40000
-    GENCODES   YES
-    OUTCOMPOUNDFIELD   s_vsw_compound_code
-    OUTVARIANTFIELD   s_vsw_variant
-    UNIQUEFIELD   s_m_title
 [STAGE:EPIK32]
     STAGECLASS   ligprep.LigPrepStage
-    INPUTS    PRE_EPIK32_RECOMBINE_OUT,
+    INPUTS    ${Ligand_name},
     OUTPUTS   EPIK32_OUT,
     RECOMBINE   YES
     RETITLE   YES
@@ -825,20 +807,29 @@ cat<<EPIK32 >> ${Inp_Name}
     USE_EPIK   YES
     MAX_STATES  64
     METAL_BINDING   YES
-    PH   ${PH}
-    PHT   2.0
+    PH   ${PH_value}
+    PHT  ${PHT}
     MAX_TAUTOMERS   16
     NRINGCONFS   16
-    COMBINEOUTS   NO
+    COMBINEOUTS   YES
     STEREO_SOURCE   parities
     NUM_STEREOISOMERS   64
     MAX_STEREOISOMERS   32
     REGULARIZE   NO
+[STAGE:POSTLIGPREP]
+    STAGECLASS   ligprep.PostLigPrepStage
+    INPUTS   EPIK32_OUT,
+    OUTPUTS   POSTEPIK32_OUT,
+    UNIQUEFIELD   s_vsw_compound_code
+    OUTVARIANTFIELD   s_vsw_variant
+    MAXSTEREO   32
+    PRESERVE_NJOBS   YES
+    REMOVE_PENALIZED_STATES   YES
 [USEROUTS:$task]
-    USEROUTS   EPIK32_OUT,
-    STRUCTOUT   EPIK32_OUT
+    USEROUTS   POSTEPIK32_OUT,
+    STRUCTOUT   POSTEPIK32_OUT
 EPIK32
-    Ligand_name="EPIK32_OUT"
+    Ligand_name="POSTEPIK32_OUT"
     TO_RMSD="${Ligand_name}"
 }
 
@@ -2844,7 +2835,9 @@ generate_INP(){
         Shape
     fi
     echo "########## Virtual Screening Workflow Input File ###############" > ${Inp_Name}
-    setGrid
+    if [ ! ${INPUT} == "None" ];then
+        setGrid
+    fi
     setdatabase
     if [ ${SMARTs} ];then
         SMARTs
@@ -2855,7 +2848,7 @@ generate_INP(){
     done
 }
 
-Params_check_and_report && for INPUT in `ls $input`
+Params_check_and_report && for INPUT in $input
 do
     Parse_Running_Mode $Running_Mode
     if [ -z $Job_Title ]; then
