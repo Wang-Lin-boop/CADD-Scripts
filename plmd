@@ -1,6 +1,6 @@
 #!/bin/bash
 #########################################################################
-# plmd, Version 1.2.0
+# plmd, Version 1.4.0
 # 2021, ShanghaiTech University, Wang Lin
 # Email: wanglin3@shanghaitech.edu.cn
 #########################################################################
@@ -283,66 +283,6 @@ MSJAA
 fi
 }
 
-function help (){
-cat<<HELP
-
-Usage: plmd [OPTION] <parameter>
-
-An automatic Desmond MD pipline for protein-ligand complex MD simulation.
-
-Example: 
-1) plmd -i "*.mae" -S INC -P "chain.name A" -L "res.ptype UNK" -H HPC_CPU -G HPC_GPU
-2) plmd -i "*.mae" -S OUC -P "chain.name A" -L "chain.name B" -t 200 -H HPC_CPU -G HPC_gpu01
-3) plmd -i "*.mae" -S "TIP4P:Cl:0.15-Na-Cl+0.02-Fe2-Cl+0.02-Mg2-Cl" -L "res.num 999" -G HPC_gpu03
-4) plmd -i "*.cms" -P "chain.name A" -L "res.ptype ADP" -H HPC_CPU -G HPC_gpu04
-
-Input parameter:
-  -i	Use a file name (Multiple files are wrapped in "", and split by ' ') *.mae or *.cms ;
-            or regular expression to represent your input file, default is *.mae.
-
-System Builder parameter:
-  -S    System Build Mode: <INC>
-            INC: System in cell, salt buffer is 0.15M KCl, water is TIP3P. Add K to neutralize system.
-            OUC: System out of cell, salt buffer is 0.15M NaCl, water is TIP3P. Add Na to neutralize system.
-            Custom Instruct: Such as: "TIP4P:Cl:0.15-Na-Cl+0.02-Fe2-Cl+0.02-Mg2-Cl"
-                Interactive addition of salt. Add Cl to neutralize system.
-                    for positive_ion: Na, Li, K, Rb, Cs, Fe2, Fe3, Mg2, Ca2, Zn2 are predefined.
-                    for nagative_ion: F, Cl, Br, I are predefined.
-                    for water: SPC, TIP3P, TIP4P, TIP5P, DMSO, METHANOL are predefined.
-
-  -b	Define a boxshape for your systems. <cubic>
-            box types: dodecahedron_hexagon, cubic, orthorhombic, triclinic
-  -s	Define a boxsize for your systems.  <15.0>
-		for dodecahedron_hexagon and cubic, defulat is 15.0;
-		for orthorhombic or triclinic box, defulat is [15.0 15.0 15.0];
-		If you want use Orthorhombic or Triclinic box, your parameter should be like "15.0 15.0 15.0"
-  -R    Redistribute the mass of heavy atoms to bonded hydrogen atoms to slow-down high frequency motions.
-  -F	Define a force field to build your systems. <OPLS_2005>
-		OPLS_2005, S-OPLS, OPLS3e, OPLS3, OPLS2 are recommended to protein-ligand systems.
-
-Simulation control parameter:
-  -m	Enter the maximum simulation time for the Brownian motion simulation, in ps. <100>
-  -t    Enter the Molecular dynamics simulation time for the product simulation, in ns. <100>
-  -T    Specify the temperature to be used, in kelvin. <310>
-  -N    Number of Repeat simulation with different random numbers. <1>
-  -P    Define a ASL to protein, such as "protein".
-  -L    Define a ASL to ligand, such as "res.ptype UNK".
-  -q    Turn off protein-ligand analysis.
-  -u    Turn off md simulation, only system build.
-  -C    Set constraint to an ASL, such as "chain.name A AND backbone"
-  -f    Set constraint force, default is 10.
-  -o    Specify the approximate number of frames in the trajectory.  <1000>
-        This value is coupled with the recording interval for the trajectory and the simulation time: the number of frames times the trajectory recording interval is the total simulation time.
-        If you adjust the number of frames, the recording interval will be modified.
-
-Job control:
-  -G	HOST of GPU queue, default is HPC_GPU.
-  -H    HOST of CPU queue, default is HPC_CPU.
-  -D	Your Desmond path. <$Desmond>
-
-Thank you for your using, If you found any question, Please contact wanglin3@shanghaitech.edu.cn.
-HELP
-}
 #Default
     # MD system build
     export System_Mode="INC"
@@ -374,11 +314,72 @@ HELP
 
     # File and Host
     export input=*.mae
-    export CPU_HOST=HPC_CPU
-    export GPU_HOST=HPC_GPU
+    export CPU_HOST=CPU
+    export GPU_HOST=GPU
 
     # Desmond
     export Desmond=${Desmond}
+
+function help (){
+cat<<HELP
+
+Usage: plmd [OPTION] <parameter>
+
+An automatic Desmond MD pipline for protein-ligand complex MD simulation.
+
+Example: 
+1) plmd -i "*.mae" -S INC -P "chain.name A" -L "res.ptype UNK" -H CPU_110 -G GPU_110
+2) plmd -i "*.mae" -S OUC -P "chain.name A" -L "chain.name B" -t 200 -H CPU_110 -G GPU_110
+3) plmd -i "*.mae" -S "TIP4P:Cl:0.15-Na-Cl+0.02-Fe2-Cl+0.02-Mg2-Cl" -L "res.num 999" -G GPU_110
+4) plmd -i "*.cms" -P "chain.name A" -L "res.ptype ADP" -H CPU_110 -G GPU_110
+
+Input parameter:
+  -i	Use a file name (Multiple files are wrapped in "", and split by ' ') *.mae or *.cms ;
+            or regular expression to represent your input file, default is *.mae.
+
+System Builder parameter:
+  -S    System Build Mode: <INC>
+            INC: System in cell, salt buffer is 0.15M KCl, water is TIP3P. Add K to neutralize system.
+            OUC: System out of cell, salt buffer is 0.15M NaCl, water is TIP3P. Add Na to neutralize system.
+            Custom Instruct: Such as: "TIP4P:Cl:0.15-Na-Cl+0.02-Fe2-Cl+0.02-Mg2-Cl"
+                Interactive addition of salt. Add Cl to neutralize system.
+                    for positive_ion: Na, Li, K, Rb, Cs, Fe2, Fe3, Mg2, Ca2, Zn2 are predefined.
+                    for nagative_ion: F, Cl, Br, I are predefined.
+                    for water: SPC, TIP3P, TIP4P, TIP5P, DMSO, METHANOL are predefined.
+
+  -b	Define a boxshape for your systems. <${boxshape}>
+            box types: dodecahedron_hexagon, cubic, orthorhombic, triclinic
+  -s	Define a boxsize for your systems.  <${boxsize}>
+		for dodecahedron_hexagon and cubic, defulat is 15.0;
+		for orthorhombic or triclinic box, defulat is [15.0 15.0 15.0];
+		If you want use Orthorhombic or Triclinic box, your parameter should be like "15.0 15.0 15.0"
+  -R    Redistribute the mass of heavy atoms to bonded hydrogen atoms to slow-down high frequency motions.
+  -F	Define a force field to build your systems. <OPLS_2005>
+		OPLS_2005, S-OPLS, OPLS3e, OPLS3, OPLS2 are recommended to protein-ligand systems.
+
+Simulation control parameter:
+  -m	Enter the maximum simulation time for the Brownian motion simulation, in ps. <${mintime}>
+  -t    Enter the Molecular dynamics simulation time for the product simulation, in ns. <100>
+  -T    Specify the temperature to be used, in kelvin. <${temperature}>
+  -N    Number of Repeat simulation with different random numbers. <${num}>
+  -P    Define a ASL to protein, such as "protein".
+  -L    Define a ASL to ligand, such as "res.ptype UNK".
+  -q    Turn off protein-ligand analysis.
+  -u    Turn off md simulation, only system build.
+  -C    Set constraint to an ASL, such as "chain.name A AND backbone"
+  -f    Set constraint force, default is 10.
+  -o    Specify the approximate number of frames in the trajectory.  <1000>
+        This value is coupled with the recording interval for the trajectory and the simulation time: the number of frames times the trajectory recording interval is the total simulation time.
+        If you adjust the number of frames, the recording interval will be modified.
+
+Job control:
+  -G	HOST of GPU queue, default is ${CPU_HOST}.
+  -H    HOST of CPU queue, default is ${GPU_HOST}.
+  -D	Your Desmond path. <${Desmond}>
+
+Thank you for your using, If you found any question, Please contact wanglin3@shanghaitech.edu.cn.
+HELP
+}
 
 while getopts ":hi:S:nb:s:RF:m:t:T:N:P:L:C:f:o:H:G:D:qu" opt
 do
@@ -447,7 +448,7 @@ done
 # Check Desmond and hostfile
 if [ -d ${Desmond} ];then
   if [ "${Desmond}" == "" ];then
-    echo "Desmond not found. Please check your Desmond Path."
+    echo "The environment variable \${Desmond} not found. Please check the Desmond in your ~/.bashrc."
     exit
   fi
   if [ "`grep -c $CPU_HOST ${Desmond}/schrodinger.hosts`" == "0" ];then
