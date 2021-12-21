@@ -30,6 +30,8 @@ These environmental variables are necessary:
 
 You can add those Environment Variables to your `~/.bashrc`!
 
+For example,  `export Desmond=/public/home/wanglin3/software/DS21`
+
 How to cite
 ----
 Citing is not required, but it is recommended that citing the script by link (such as: `GVSrun(https://github.com/Wang-Lin-boop/Schrodinger-Script)`) to promote reproducibility of your work.
