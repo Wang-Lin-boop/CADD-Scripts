@@ -1,6 +1,6 @@
 #!/bin/bash
 #########################################################################
-# GVSrun, Version 1.4.1
+# GVSrun, Version 1.4.5
 # 2021, ShanghaiTech University, Wang Lin
 # Email: wanglin3@shanghaitech.edu.cn
 #########################################################################
@@ -17,7 +17,7 @@
     done
 
     #Host and Schrodinger Path
-    HOST=HPC_CPU
+    HOST=CPU
     Njobs=100
     SCHRODINGER=${SCHRODINGER}
     Prime=10
@@ -31,6 +31,7 @@
     #INPUT
     input=None
     Running_Mode="Fast"
+    Database="Custom_DB"
 
     #Setting
     PH=7.0:2.0
@@ -53,7 +54,9 @@
     keep_num=10000
     atomtypes=mmod
     shape_sample_method=rapid
-    max_confs=1000
+    max_confs=1200
+    shape_screen_default="${keep_num}:${atomtypes}:${shape_sample_method}:${max_confs}"
+    shape_screen_Array=(${shape_screen_default//:/ })
     shape_screen_swith=false
 
 options(){
@@ -68,8 +71,6 @@ These options are supported by this script.
             "HTVS_Normal+SP_Normal"
         Normal: Filter The Drug-like compounds and dock screening.
             "RDL+HTVS_Normal+QIKPROP+R5R+SP_ExtensionA"
-        Advance: dock screening and clustering.
-            "HTVS_Normal+SP_ExtensionA+Topo_Tanimoto"
         Local: Local docking and screening were carried out using the input ligand structure.
              "HTVS_local+SP_local+MMGBSA_OPT"
         Reference: Virtual Screening with reference ligand restrain.
@@ -84,6 +85,12 @@ These options are supported by this script.
             "IFT_pre+IFT"
         QM_Screening: Virtual Screening and QMMM re-docking.
             "RDL+HTVS_Normal+QIKPROP+R5R+SP_ExtensionA+QM_redock+RMSD"
+        Advance: dock screening.
+            "HTVS_Normal+SP_ExtensionA+SP_Enhanced"
+        Shape_Screening: perform screening based on reference ligand shape.
+            "PhaseShape+HTVS_local+SP_local"
+        Advance_Shape_Screening: perform screening based on reference ligand shape.
+            "HTVS_Shape+SP_Shape"
 
         or Custom Running Mode, e.g. -m "EDL+R+HTVS+CD"
 
@@ -123,7 +130,7 @@ These options are supported by this script.
             Combine_CONFGEN: Preform ConfSearch with two user defined force field and MMFFs.
 
         @Screening: Reduce the number of compounds rough docking. Related to -a option.
-            Shape: Shape Screening using external app, taken together with the local mode!
+            localShape: Shape Screening using external app, taken together with the local mode!
                     NOTE: Must be the first in the pipeline. 
             PhaseShape: Shape Screening in pipeline. 
             HTVS_Normal: The standard HTVS screening.
@@ -134,6 +141,7 @@ These options are supported by this script.
                             which is usually used as a post-processing for pharmacophore screening.
             IFT_pre: Pre-screening for Induce fit docking, also useful for screening before Covalent Docking.
                         NOTE: Set RECEP_VSCALE to 0.50 in Grid Geneation is a good idea.
+            HTVS_Shape: Docking with reference ligand shape. with -R and -E option.
 
         @Standard_Docking: Standard docking was performed to rank the compounds. Related to -b and -c option.
             SP_Normal: The standard SP docking.
@@ -141,9 +149,10 @@ These options are supported by this script.
             SP_ExtensionB: Besides 'ExtensionA', also Accept aromatic hydrogens(>0.15) as potential H-bond donors.
             SP_REF: The standard SP docking based on a template ligand, This will significantly increase the hit rate.
             SP_Fragment: It is suitable for docking and scoring of compound fragments.
-            SP_Enhanced: Increase the depth of sampling for larger grid orMore accurate poses.
+            SP_Enhanced: Increase the depth of sampling for larger grid or More accurate poses.
             SP_local: Docking is performed using the initial coordinates of the ligand,
                             which is usually used as a post-processing for pharmacophore screening.
+            SP_Shape: Docking with reference ligand shape. with -R and -E option.
             XP_Normal: The standard XP docking.
             XP_ExtensionA: Reward intramolecular ligand hydrogen bonds, and accept halogens as H-bond acceptors.
             XP_ExtensionB: Besides 'ExtensionA', also Accept aromatic hydrogens(>0.15) as potential H-bond donors.
@@ -190,7 +199,8 @@ Input parameter:
   -i	Gird file input.
         Use a file name (Multiple files are wrapped in "", and split by ' ') or regular expression to represent your input Grid file, default is *.zip.
   -D    Which databases do you want to screen? The Database basic path is <$Database_Path>.
-            ${Database_list}are Supported.
+        These database are Supported:
+            ${Database_list}
   -d    Provide your own database path, the compounds files are recommended as maegz or SDF file format.
   -R    Optional, reference Ligands correlated with the grid or use for RMSD calculation. 
             As *.mae, *.maegz (for query structure) or *.phypo (for pharmacophore hypothesis).
@@ -201,12 +211,14 @@ Input parameter:
         Normal: Filter The Drug-like compounds and dock screening.
         Reference: Virtual Screening with reference ligand restrain.
         Prep_Normal: Virtual Screening for un-prepared compounds database.
-        Normal_MMGBSA: Virtual Screening and MMGBSA re-scoring.
-        Cov_Screening: Virtual Screening to discover covalent durg.
-        Induce_Fit_Screening: Induce fit screening.
-        QM_Screening: Virtual Screening and QMMM re-docking.
+        *Normal_MMGBSA: Virtual Screening and MMGBSA re-scoring.
+        *Cov_Screening: Virtual Screening to discover covalent durg.
+        *Induce_Fit_Screening: Induce fit screening.
+        *QM_Screening: Virtual Screening and QMMM re-docking.
         Local: Local docking and screening were carried out using the input ligand structure.
+        Shape_Screening: perform screening based on reference ligand shape.
         Advance: dock screening and clustering.
+        Advance_Shape_Screening: perform screening based on reference ligand shape.
     @ or Custom Running Mode, e.g. -m "EDL+R+HTVS+CD"
 
 Control parameters:
@@ -221,7 +233,7 @@ Control parameters:
             Other QM setting: "B3LYP-D3M(BJ):6-311G+**","M06‑2X:def2-tzvpp(-g)","wB97M‑V:cc-pVTZ-pp"
   -p    set a PH:PHT for ligPrep, default is 7.0:2.0, means 7.0±2.0. <7.0:2.0>
   -s    Set a SMARTs Expression for compounds filter at first step. such as [B]([O])[O].
-  -E    Shape Screening Options. <10000:mmod:rapid:1000>
+  -E    Shape Screening Options. <${shape_screen_default}>
             The paramter means: "keep_num:atomtypes:shape_sample_method:max_confs";
             NOTE: element and qsar are alternative atomtypes; thorough are alternative shape_sample_method.
 
@@ -234,7 +246,7 @@ OUTPUT parameters:
   -e    The number of candidates to IFT/CD/MMGBSA/QMMM. <500>
 
 Job control:
-  -H	Host Name of your Queue, defult is HPC_CPU.
+  -H	Host Name of your Queue, defult is ${HOST}.
   -N    The max number of subjobs. <100>
   -G    The number of Glide subjobs. <90>
   -P    The number of Prime subjobs. <10>
@@ -343,10 +355,14 @@ Parse_Running_Mode(){
         Pipeline="HTVS_Normal+SP_Normal"
     elif [ $Running_Mode == "QM_Screening" ]; then
         Pipeline="RDL+HTVS_Normal+QIKPROP+R5R+SP_ExtensionA+QM_redock+RMSD"
+    elif [ $Running_Mode == "Shape_Screening" ];then
+        Pipeline="PhaseShape+HTVS_local+SP_local"
     elif [ $Running_Mode == "Local" ];then
         Pipeline="HTVS_local+SP_local+MMGBSA_OPT"
     elif [ $Running_Mode == "Advance" ];then
-        Pipeline="HTVS_Normal+SP_ExtensionA+Topo_Tanimoto"
+        Pipeline="HTVS_Normal+SP_ExtensionA+SP_Enhanced"
+    elif [ $Running_Mode == "Advance_Shape_Screening" ];then
+        Pipeline="HTVS_Shape+SP_Shape"
     else 
         Pipeline=$Running_Mode
         Running_Mode="User_Defined"
@@ -365,6 +381,8 @@ if [ -d ${SCHRODINGER} ];then
   fi
   if [ "`grep -c $HOST ${SCHRODINGER}/schrodinger.hosts`" == "0" ];then
     echo $HOST "Host not found."
+    echo "These host are available:"
+    grep "^name" ${SCHRODINGER}/schrodinger.hosts | awk '{print $2}'
     exit
   fi
 else
@@ -486,7 +504,7 @@ cat<<QIKPROP >> ${Inp_Name}
     INPUTS   PRE_QIKPROP_RECOMBINE_OUT,
     OUTPUTS   QIKPROP_OUT,
     RECOMBINE   YES
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   QIKPROP_OUT,
     STRUCTOUT   QIKPROP_OUT
 QIKPROP
@@ -500,7 +518,7 @@ cat<<5R >> ${Inp_Name}
     INPUTS   ${Ligand_name},
     OUTPUTS   5R_OUT,
     CONDITIONS   "r_qp_mol_MW <= 500", "r_qp_QPlogPo/w <= 5", "r_qp_donorHB <= 5", "r_qp_accptHB <= 10", "r_qp_PSA <= 120"
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   5R_OUT,
     STRUCTOUT   5R_OUT
 5R
@@ -514,7 +532,7 @@ cat<<BBB >> ${Inp_Name}
     INPUTS   ${Ligand_name},
     OUTPUTS   BBB_OUT,
     CONDITIONS   "r_qp_mol_MW <= 450", "r_qp_QPlogPo/w <= 5 AND > 2", "r_qp_PSA <= 90", "Num_rotatable_bonds <= 8","r_qp_donorHB <= 3", "r_qp_QPlogBB >= -3.0 AND <= 1.2", "r_qp_QPPMDCK >= 25"
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   BBB_OUT,
     STRUCTOUT   BBB_OUT
 BBB
@@ -528,7 +546,7 @@ cat<<3R >> ${Inp_Name}
     INPUTS   ${Ligand_name},
     OUTPUTS   3R_OUT,
     CONDITIONS   "r_qp_QPlogS > -5.7", "r_qp_QPPCaco > 22", "r_qp_accptHB <= 10", "r_qp_#metab < 7"
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   3R_OUT,
     STRUCTOUT   3R_OUT
 3R
@@ -542,7 +560,7 @@ cat<<R5R >> ${Inp_Name}
     INPUTS   ${Ligand_name},
     OUTPUTS   R5R_OUT,
     CONDITIONS   "r_qp_mol_MW <= 650", "r_qp_QPlogPo/w <= 7", "r_qp_donorHB <= 6", "r_qp_accptHB <= 20"
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   R5R_OUT,
     STRUCTOUT   R5R_OUT
 R5R
@@ -556,7 +574,7 @@ cat<<Star >> ${Inp_Name}
     INPUTS   ${Ligand_name},
     OUTPUTS   Star_OUT,
     CONDITIONS   "r_qp_#Star <= 5"
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   Star_OUT,
     STRUCTOUT   Star_OUT
 Star
@@ -570,7 +588,7 @@ cat<<Oral >> ${Inp_Name}
     INPUTS   ${Ligand_name},
     OUTPUTS   Oral_OUT,
     CONDITIONS   "r_qp_HumanOralAbsorption >= 2"
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   Oral_OUT,
     STRUCTOUT   Oral_OUT
 Oral
@@ -584,7 +602,7 @@ cat<<Oral_Drug >> ${Inp_Name}
     INPUTS   ${Ligand_name},
     OUTPUTS   Oral_Drug_OUT,
     CONDITIONS   "r_qp_RuleOfFive < 2", "r_qp_RuleOfThree < 2"
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   Oral_Drug_OUT,
     STRUCTOUT   Oral_Drug_OUT
 Oral_Drug
@@ -679,7 +697,7 @@ cat<<Warhead >> ${Inp_Name}
     INPUTS   ${Ligand_name},
     OUTPUTS   Warhead_SO_OUT,
     CONDITIONS   "Michael_acceptors >= 1 OR [B]([O])[O] >= 1 OR [C;r3][O;r3][C;r3] >= 1 OR [S;X2;H1] >= 1 OR [C]#[N] >=1 OR [O-0X1]=[C]1[C][C][N]1 >= 1 OR [O]=[C,c]-[C,c]=[O] >=1 OR NC(=O)C(=O)C(C)N >= 1 OR [C,c]=[C,c]-[C,c]#[N,n] >= 1 OR [C-0X2]#[C-0X2][C-0X3]=[O-0X1] >= 1 OR [C][S][S][H] >= 1 OR [N]=[O,S] >= 1 OR [N]=[C]=[S] >= 1 OR  [C;H1]([Cl])-[C](=[O]) >= 1  OR  [C]=[C][c][n] >= 1"
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   Warhead_OUT,
     STRUCTOUT   Warhead_OUT
 Warhead
@@ -744,15 +762,22 @@ cat<<IONIZE >> ${Inp_Name}
     OUTVARIANTFIELD   s_vsw_variant
     PRESERVE_NJOBS   YES
     REMOVE_PENALIZED_STATES   YES
-[USEROUTS:$task]
-    USEROUTS   POSTIONIZE_OUT,
-    STRUCTOUT   POSTIONIZE_OUT
+[STAGE:RestoreTitle]
+    STAGECLASS  gencodes.RestoreTitlesStage
+    INPUTS   POSTIONIZE_OUT,
+    OUTPUTS     LIGPREP_OUT,
+[USEROUTS:${task}]
+    USEROUTS   LIGPREP_OUT,
+    STRUCTOUT   LIGPREP_OUT
 IONIZE
-    Ligand_name="POSTIONIZE_OUT"
+    Ligand_name="LIGPREP_OUT"
     TO_RMSD="${Ligand_name}"
 }
 
 EPIK4(){
+    PH_array=(${PH//:/ })
+    PH_value=${PH_array[0]}
+    PHT=${PH_array[1]}
 cat<<EPIK4 >> ${Inp_Name}
 [STAGE:EPIK4]
     STAGECLASS   ligprep.LigPrepStage
@@ -784,15 +809,22 @@ cat<<EPIK4 >> ${Inp_Name}
     OUTVARIANTFIELD   s_vsw_variant
     PRESERVE_NJOBS   YES
     REMOVE_PENALIZED_STATES   YES
-[USEROUTS:$task]
-    USEROUTS   POSTEPIK4_OUT,
-    STRUCTOUT   POSTEPIK4_OUT
+[STAGE:RestoreTitle]
+    STAGECLASS  gencodes.RestoreTitlesStage
+    INPUTS   POSTEPIK4_OUT,
+    OUTPUTS     LIGPREP_OUT,
+[USEROUTS:${task}]
+    USEROUTS   LIGPREP_OUT,
+    STRUCTOUT   LIGPREP_OUT
 EPIK4
-    Ligand_name="POSTEPIK4_OUT"
+    Ligand_name="LIGPREP_OUT"
     TO_RMSD="${Ligand_name}"
 }
 
 EPIK32(){
+    PH_array=(${PH//:/ })
+    PH_value=${PH_array[0]}
+    PHT=${PH_array[1]}
 cat<<EPIK32 >> ${Inp_Name}
 [STAGE:EPIK32]
     STAGECLASS   ligprep.LigPrepStage
@@ -825,11 +857,15 @@ cat<<EPIK32 >> ${Inp_Name}
     MAXSTEREO   32
     PRESERVE_NJOBS   YES
     REMOVE_PENALIZED_STATES   YES
-[USEROUTS:$task]
-    USEROUTS   POSTEPIK32_OUT,
-    STRUCTOUT   POSTEPIK32_OUT
+[STAGE:RestoreTitle]
+    STAGECLASS  gencodes.RestoreTitlesStage
+    INPUTS   POSTEPIK32_OUT,
+    OUTPUTS     LIGPREP_OUT,
+[USEROUTS:${task}]
+    USEROUTS   LIGPREP_OUT,
+    STRUCTOUT   LIGPREP_OUT
 EPIK32
-    Ligand_name="POSTEPIK32_OUT"
+    Ligand_name="LIGPREP_OUT"
     TO_RMSD="${Ligand_name}"
 }
 
@@ -851,13 +887,14 @@ cat<<RS1 >> ${Inp_Name}
     STAGECLASS   macromodel.SampleRingsStage
     INPUTS    PRE_RS1_RECOMBINE_OUT,
     OUTPUTS   RS1_OUT,
+    RECOMBINE   YES
     FORCE_FIELD ${Force_Field}
     SOLVENT Water
     ELECTROSTATIC_TREATMENT Constant dielectric
     CHARGES_FROM    Force field
     MAXIMUM_ITERATION   300
     OUTCONFS_PER_SEARCH 2
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   RS1_OUT,
     STRUCTOUT   RS1_OUT
 RS1
@@ -883,13 +920,14 @@ cat<<RS4 >> ${Inp_Name}
     STAGECLASS   macromodel.SampleRingsStage
     INPUTS    PRE_RS4_RECOMBINE_OUT,
     OUTPUTS   RS4_OUT,
+    RECOMBINE   YES
     FORCE_FIELD ${Force_Field}
     SOLVENT Water
     ELECTROSTATIC_TREATMENT Constant dielectric
     CHARGES_FROM    Force field
     MAXIMUM_ITERATION   500
     OUTCONFS_PER_SEARCH 8
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   RS4_OUT,
     STRUCTOUT   RS4_OUT
 RS4
@@ -915,13 +953,14 @@ cat<<RS_Fast >> ${Inp_Name}
     STAGECLASS   macromodel.SampleRingsStage
     INPUTS    PRE_RS_Fast_RECOMBINE_OUT,
     OUTPUTS   RS_Fast_OUT,
+    RECOMBINE   YES
     FORCE_FIELD ${Force_Field}
     SOLVENT Water
     ELECTROSTATIC_TREATMENT Constant dielectric
     CHARGES_FROM    Force field
     MAXIMUM_ITERATION   100
     OUTCONFS_PER_SEARCH 2
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   RS_Fast_OUT,
     STRUCTOUT   RS_Fast_OUT
 RS_Fast
@@ -946,6 +985,7 @@ cat<<CONFGEN >> ${Inp_Name}
 [STAGE:CONFGEN]
     STAGECLASS   macromodel.ConfSearchStage
     INPUTS    PRE_CONFGEN_RECOMBINE_OUT,
+    RECOMBINE   YES
     OUTPUTS   CONFGEN_OUT,
     JOB_TYPE    CONFSEARCH
     FORCE_FIELD ${Force_Field}
@@ -962,7 +1002,7 @@ cat<<CONFGEN >> ${Inp_Name}
     OUTPUTS   CONFGEN_COMBINED,
     LABELFIELD   s_vsw_conformer_field
     LABELS   Original, OPLS
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   CONFGEN_OUT,
     STRUCTOUT   CONFGEN_OUT
 CONFGEN
@@ -987,6 +1027,7 @@ cat<<CONFGEN >> ${Inp_Name}
 [STAGE:CONFGEN_Fast]
     STAGECLASS   macromodel.ConfSearchStage
     INPUTS    PRE_CONFGEN_Fast_RECOMBINE_OUT,
+    RECOMBINE   YES
     OUTPUTS   CONFGEN_Fast_OUT,
     JOB_TYPE    CONFSEARCH
     FORCE_FIELD ${Force_Field}
@@ -1003,7 +1044,7 @@ cat<<CONFGEN >> ${Inp_Name}
     OUTPUTS   CONFGEN_COMBINED,
     LABELFIELD   s_vsw_conformer_field
     LABELS   Original, OPLS
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   CONFGEN_Fast_OUT,
     STRUCTOUT   CONFGEN_Fast_OUT
 CONFGEN
@@ -1028,6 +1069,7 @@ cat<<MMFF_CONFGEN >> ${Inp_Name}
 [STAGE:MMFF_CONFGEN]
     STAGECLASS   macromodel.ConfSearchStage
     INPUTS    PRE_MMFF_CONFGEN_RECOMBINE_OUT,
+    RECOMBINE   YES
     OUTPUTS   MMFF_CONFGEN_OUT,
     JOB_TYPE    CONFSEARCH
     FORCE_FIELD MMFFs
@@ -1044,7 +1086,7 @@ cat<<MMFF_CONFGEN >> ${Inp_Name}
     OUTPUTS   CONFGEN_COMBINED,
     LABELFIELD   s_vsw_conformer_field
     LABELS   Original, MMFFS
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   MMFF_CONFGEN_OUT,
     STRUCTOUT   MMFF_CONFGEN_OUT
 MMFF_CONFGEN
@@ -1070,6 +1112,7 @@ cat<<MMFF_CONFGEN >> ${Inp_Name}
     STAGECLASS   macromodel.ConfSearchStage
     INPUTS    PRE_Combine_CONFGEN_RECOMBINE_OUT,
     OUTPUTS   OPLS_CONFGEN_OUT,
+    RECOMBINE   YES
     JOB_TYPE    CONFSEARCH
     FORCE_FIELD ${Force_Field}
     SOLVENT Water
@@ -1083,6 +1126,7 @@ cat<<MMFF_CONFGEN >> ${Inp_Name}
     STAGECLASS   macromodel.ConfSearchStage
     INPUTS    PRE_Combine_CONFGEN_RECOMBINE_OUT,
     OUTPUTS   MMFF_CONFGEN_OUT,
+    RECOMBINE   YES
     JOB_TYPE    CONFSEARCH
     FORCE_FIELD MMFFs
     SOLVENT Water
@@ -1098,7 +1142,7 @@ cat<<MMFF_CONFGEN >> ${Inp_Name}
     OUTPUTS   CONFGEN_COMBINED,
     LABELFIELD   s_vsw_conformer_field
     LABELS   Original, OPLS, MMFFS
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   CONFGEN_COMBINED,
     STRUCTOUT   CONFGEN_COMBINED
 MMFF_CONFGEN
@@ -1158,7 +1202,7 @@ cat<<HTVS >> ${Inp_Name}
     INPUTS   HTVS_OUT, HTVS_RECOMBINE_OUT
     OUTPUTS   HTVS_OUT_ORIG,
     UNIQUEFIELD   s_vsw_variant
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   HTVS_OUT,
     STRUCTOUT   HTVS_OUT
 HTVS
@@ -1212,7 +1256,7 @@ cat<<HTVS >> ${Inp_Name}
     INPUTS   HTVS_OUT, HTVS_RECOMBINE_OUT
     OUTPUTS   HTVS_OUT_ORIG,
     UNIQUEFIELD   s_vsw_variant
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   HTVS_OUT,
     STRUCTOUT   HTVS_OUT
 HTVS
@@ -1265,7 +1309,7 @@ cat<<HTVS >> ${Inp_Name}
     INPUTS   HTVS_OUT, HTVS_RECOMBINE_OUT
     OUTPUTS   HTVS_OUT_ORIG,
     UNIQUEFIELD   s_vsw_variant
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   HTVS_OUT,
     STRUCTOUT   HTVS_OUT
 HTVS
@@ -1319,16 +1363,68 @@ cat<<HTVS >> ${Inp_Name}
     CORE_SNAP   YES
     CORE_POS_MAX_RMSD   0.52
     CORECONS_FALLBACK   YES
-[STAGE:PULL_HTVS]
-    STAGECLASS   pull.PullStage
-    INPUTS   HTVS_OUT, HTVS_RECOMBINE_OUT
-    OUTPUTS   HTVS_OUT_ORIG,
-    UNIQUEFIELD   s_vsw_variant
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   HTVS_OUT,
     STRUCTOUT   HTVS_OUT
 HTVS
-    Ligand_name="HTVS_OUT_ORIG"
+    Ligand_name="HTVS_OUT"
+    TO_RMSD="${Ligand_name}"
+}
+
+HTVS_Shape(){
+    KEEP_NUM=`parse_num_or_percentage ${HTVS_out_num}`
+    keep_num=${shape_screen_Array[0]}
+    atomtypes=`echo "${shape_screen_Array[1]}" | tr 'a-z' 'A-Z'`
+    shape_sample_method=${shape_screen_Array[2]}
+    max_confs=${shape_screen_Array[3]}
+    if [ ${Reference_Ligand:-5} == "phypo" ];then
+        atomtypes="PHARM"
+    fi
+cat<<HTVS >> ${Inp_Name}
+[STAGE:PRE_DOCK_HTVS]
+    STAGECLASS   gencodes.RecombineStage
+    INPUTS   ${Ligand_name},
+    OUTPUTS   HTVS_RECOMBINE_OUT,
+    NUMOUT   njobs
+    OUTFORMAT   maegz
+    MIN_SUBJOB_STS   4000
+    MAX_SUBJOB_STS   40000
+    GENCODES   YES
+    OUTCOMPOUNDFIELD   s_vsw_compound_code
+    OUTVARIANTFIELD   s_vsw_variant
+    UNIQUEFIELD   NONE
+[STAGE:DOCK_HTVS]
+    STAGECLASS   glide.DockingStage
+    INPUTS   HTVS_RECOMBINE_OUT, GRID
+    OUTPUTS   HTVS_OUT,
+    RECOMBINE   NO
+    PRECISION   HTVS
+    UNIQUEFIELD   s_vsw_compound_code
+    ${KEEP_NUM}
+    FORCEFIELD  ${corse_ff}
+    DOCKING_METHOD   confgen
+    POSES_PER_LIG   1
+    BEST_BY_TITLE   NO
+    LIG_VSCALE   0.8
+    LIG_CCUT   0.15
+    MAXATOMS   500
+    MAXROTBONDS   50
+    RINGCONFCUT 2.5
+    AMIDE_MODE   penal
+    POSE_OUTTYPE   LIB
+    POSTDOCK   YES
+    POSTDOCKSTRAIN   NO
+    COMPRESS_POSES   YES
+    EPIK_PENALTIES   YES
+    FORCEPLANAR   NO
+    SHAPE_RESTRAIN  YES
+    SHAPE_REF_LIGAND_FILE   ${Reference_Ligand}
+    SHAPE_TYPING    ${atomtypes}
+[USEROUTS:${task}]
+    USEROUTS   HTVS_OUT,
+    STRUCTOUT   HTVS_OUT
+HTVS
+    Ligand_name="HTVS_OUT"
     TO_RMSD="${Ligand_name}"
 }
 
@@ -1373,16 +1469,11 @@ cat<<HTVS >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[STAGE:PULL_HTVS]
-    STAGECLASS   pull.PullStage
-    INPUTS   HTVS_OUT, HTVS_RECOMBINE_OUT
-    OUTPUTS   HTVS_OUT_ORIG,
-    UNIQUEFIELD   s_vsw_variant
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   HTVS_OUT,
     STRUCTOUT   HTVS_OUT
 HTVS
-    Ligand_name="HTVS_OUT_ORIG"
+    Ligand_name="HTVS_OUT"
     TO_RMSD="${Ligand_name}"
 }
 
@@ -1426,16 +1517,11 @@ cat<<HTVS >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[STAGE:PULL_HTVS]
-    STAGECLASS   pull.PullStage
-    INPUTS   HTVS_OUT, HTVS_RECOMBINE_OUT
-    OUTPUTS   HTVS_OUT_ORIG,
-    UNIQUEFIELD   s_vsw_variant
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   HTVS_OUT,
     STRUCTOUT   HTVS_OUT
 HTVS
-    Ligand_name="HTVS_OUT_ORIG"
+    Ligand_name="HTVS_OUT"
     TO_RMSD="${Ligand_name}"
 }
 
@@ -1443,20 +1529,20 @@ SP_Normal(){
     TO_RMSD="${Ligand_name}"
     KEEP_NUM=`parse_num_or_percentage ${Docking_out_num}`
 cat<<SP >> ${Inp_Name}
-[STAGE:PRE_DOCK_SP]
+[STAGE:PRE_DOCK_${task}]
     STAGECLASS   gencodes.RecombineStage
     INPUTS   ${Ligand_name},
-    OUTPUTS   DOCK_SP_INPUT,
+    OUTPUTS   DOCK_${task}_INPUT,
     NUMOUT   njobs
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
     GENCODES   NO
     UNIQUEFIELD   s_vsw_compound_code
-[STAGE:DOCK_SP]
+[STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
-    INPUTS   DOCK_SP_INPUT, GRID
-    OUTPUTS   SP_OUT,
+    INPUTS   DOCK_${task}_INPUT, GRID
+    OUTPUTS   ${task}_SP_OUT,
     RECOMBINE   NO
     PRECISION   SP
     UNIQUEFIELD   s_vsw_compound_code
@@ -1478,31 +1564,31 @@ cat<<SP >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS:$task]
-    USEROUTS   SP_OUT,
-    STRUCTOUT   SP_OUT
+[USEROUTS:${task}]
+    USEROUTS   ${task}_SP_OUT,
+    STRUCTOUT   ${task}_SP_OUT
 SP
-    Ligand_name="SP_OUT"
+    Ligand_name="${task}_SP_OUT"
 }
 
 SP_ExtensionA(){
     TO_RMSD="${Ligand_name}"
     KEEP_NUM=`parse_num_or_percentage ${Docking_out_num}`
 cat<<SP >> ${Inp_Name}
-[STAGE:PRE_DOCK_SP]
+[STAGE:PRE_DOCK_${task}]
     STAGECLASS   gencodes.RecombineStage
     INPUTS   ${Ligand_name},
-    OUTPUTS   DOCK_SP_INPUT,
+    OUTPUTS   DOCK_${task}_INPUT,
     NUMOUT   njobs
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
     GENCODES   NO
     UNIQUEFIELD   s_vsw_compound_code
-[STAGE:DOCK_SP]
+[STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
-    INPUTS   DOCK_SP_INPUT, GRID
-    OUTPUTS   SP_OUT,
+    INPUTS   DOCK_${task}_INPUT, GRID
+    OUTPUTS   ${task}_SP_OUT,
     RECOMBINE   NO
     PRECISION   SP
     REWARD_INTRA_HBONDS YES
@@ -1526,31 +1612,31 @@ cat<<SP >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS:$task]
-    USEROUTS   SP_OUT,
-    STRUCTOUT   SP_OUT
+[USEROUTS:${task}]
+    USEROUTS   ${task}_SP_OUT,
+    STRUCTOUT   ${task}_SP_OUT
 SP
-    Ligand_name="SP_OUT"
+    Ligand_name="${task}_SP_OUT"
 }
 
 SP_ExtensionB(){
     TO_RMSD="${Ligand_name}"
     KEEP_NUM=`parse_num_or_percentage ${Docking_out_num}`
 cat<<SP >> ${Inp_Name}
-[STAGE:PRE_DOCK_SP]
+[STAGE:PRE_DOCK_${task}]
     STAGECLASS   gencodes.RecombineStage
     INPUTS   ${Ligand_name},
-    OUTPUTS   DOCK_SP_INPUT,
+    OUTPUTS   DOCK_${task}_INPUT,
     NUMOUT   njobs
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
     GENCODES   NO
     UNIQUEFIELD   s_vsw_compound_code
-[STAGE:DOCK_SP]
+[STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
-    INPUTS   DOCK_SP_INPUT, GRID
-    OUTPUTS   SP_OUT,
+    INPUTS   DOCK_${task}_INPUT, GRID
+    OUTPUTS   ${task}_SP_OUT,
     RECOMBINE   NO
     PRECISION   SP
     REWARD_INTRA_HBONDS YES
@@ -1572,35 +1658,35 @@ cat<<SP >> ${Inp_Name}
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
     POSTDOCK   YES
-    POSTDOCKSTRAIN   NO
+    POSTDOCKSTRAIN   True
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS:$task]
-    USEROUTS   SP_OUT,
-    STRUCTOUT   SP_OUT
+[USEROUTS:${task}]
+    USEROUTS   ${task}_SP_OUT,
+    STRUCTOUT   ${task}_SP_OUT
 SP
-    Ligand_name="SP_OUT"
+    Ligand_name="${task}_SP_OUT"
 }
 
 SP_REF(){
     TO_RMSD="${Ligand_name}"
     KEEP_NUM=`parse_num_or_percentage ${Docking_out_num}`
 cat<<SP >> ${Inp_Name}
-[STAGE:PRE_DOCK_SP]
+[STAGE:PRE_DOCK_${task}]
     STAGECLASS   gencodes.RecombineStage
     INPUTS   ${Ligand_name},
-    OUTPUTS   DOCK_SP_INPUT,
+    OUTPUTS   DOCK_${task}_INPUT,
     NUMOUT   njobs
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
     GENCODES   NO
     UNIQUEFIELD   s_vsw_compound_code
-[STAGE:DOCK_SP]
+[STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
-    INPUTS   DOCK_SP_INPUT, GRID
-    OUTPUTS   SP_OUT,
+    INPUTS   DOCK_${task}_INPUT, GRID
+    OUTPUTS   ${task}_SP_OUT,
     RECOMBINE   NO
     PRECISION   SP
     REWARD_INTRA_HBONDS YES
@@ -1620,7 +1706,7 @@ cat<<SP >> ${Inp_Name}
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
     POSTDOCK   YES
-    POSTDOCKSTRAIN   NO
+    POSTDOCKSTRAIN   True
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
@@ -1631,31 +1717,92 @@ cat<<SP >> ${Inp_Name}
     CORE_SNAP   YES
     CORE_POS_MAX_RMSD   0.52
     CORECONS_FALLBACK   YES
-[USEROUTS:$task]
-    USEROUTS   SP_OUT,
-    STRUCTOUT   SP_OUT
+[USEROUTS:${task}]
+    USEROUTS   ${task}_SP_OUT,
+    STRUCTOUT   ${task}_SP_OUT
 SP
-    Ligand_name="SP_OUT"
+    Ligand_name="${task}_SP_OUT"
 }
 
-SP_Fragment(){
+SP_Shape(){
     TO_RMSD="${Ligand_name}"
     KEEP_NUM=`parse_num_or_percentage ${Docking_out_num}`
+    keep_num=${shape_screen_Array[0]}
+    atomtypes=`echo "${shape_screen_Array[1]}" | tr 'a-z' 'A-Z'`
+    shape_sample_method=${shape_screen_Array[2]}
+    max_confs=${shape_screen_Array[3]}
+    if [ ${Reference_Ligand:-5} == "phypo" ];then
+        atomtypes="PHARM"
+    fi
 cat<<SP >> ${Inp_Name}
-[STAGE:PRE_DOCK_SP]
+[STAGE:PRE_DOCK_${task}]
     STAGECLASS   gencodes.RecombineStage
     INPUTS   ${Ligand_name},
-    OUTPUTS   DOCK_SP_INPUT,
+    OUTPUTS   DOCK_${task}_INPUT,
     NUMOUT   njobs
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
     GENCODES   NO
     UNIQUEFIELD   s_vsw_compound_code
-[STAGE:DOCK_SP]
+[STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
-    INPUTS   DOCK_SP_INPUT, GRID
-    OUTPUTS   SP_OUT,
+    INPUTS   DOCK_${task}_INPUT, GRID
+    OUTPUTS   ${task}_SP_OUT,
+    RECOMBINE   NO
+    PRECISION   SP
+    REWARD_INTRA_HBONDS YES
+    HBOND_ACCEP_HALO    YES
+    UNIQUEFIELD   s_vsw_compound_code
+    ${KEEP_NUM}
+    FORCEFIELD  ${Force_Field}
+    DOCKING_METHOD   confgen
+    POSES_PER_LIG   ${Dock_out_conf}
+    WRITE_XP_DESC   NO
+    NENHANCED_SAMPLING   1
+    BEST_BY_TITLE   NO
+    LIG_VSCALE   0.8
+    LIG_CCUT   0.15
+    MAXATOMS   500
+    MAXROTBONDS   50
+    AMIDE_MODE   penal
+    POSE_OUTTYPE   PV
+    POSTDOCK   YES
+    POSTDOCKSTRAIN   True
+    COMPRESS_POSES   YES
+    EPIK_PENALTIES   YES
+    FORCEPLANAR   NO
+    SHAPE_RESTRAIN  YES
+    SHAPE_REF_LIGAND_FILE   ${Reference_Ligand}
+    SHAPE_TYPING    ${atomtypes}
+    POSTDOCK   YES
+    POSTDOCK_NPOSE  10
+    POSTDOCKSTRAIN   True
+[USEROUTS:${task}]
+    USEROUTS   ${task}_SP_OUT,
+    STRUCTOUT   ${task}_SP_OUT
+SP
+    Ligand_name="${task}_SP_OUT"
+}
+
+SP_Fragment(){
+    TO_RMSD="${Ligand_name}"
+    KEEP_NUM=`parse_num_or_percentage ${Docking_out_num}`
+cat<<SP >> ${Inp_Name}
+[STAGE:PRE_DOCK_${task}]
+    STAGECLASS   gencodes.RecombineStage
+    INPUTS   ${Ligand_name},
+    OUTPUTS   DOCK_${task}_INPUT,
+    NUMOUT   njobs
+    OUTFORMAT   maegz
+    MIN_SUBJOB_STS   300
+    MAX_SUBJOB_STS   5000
+    GENCODES   NO
+    UNIQUEFIELD   s_vsw_compound_code
+[STAGE:DOCK_${task}]
+    STAGECLASS   glide.DockingStage
+    INPUTS   DOCK_${task}_INPUT, GRID
+    OUTPUTS   ${task}_SP_OUT,
     RECOMBINE   NO
     PRECISION   SP
     REWARD_INTRA_HBONDS YES
@@ -1680,31 +1827,31 @@ cat<<SP >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS:$task]
-    USEROUTS   SP_OUT,
-    STRUCTOUT   SP_OUT
+[USEROUTS:${task}]
+    USEROUTS   ${task}_SP_OUT,
+    STRUCTOUT   ${task}_SP_OUT
 SP
-    Ligand_name="SP_OUT"
+    Ligand_name="${task}_SP_OUT"
 }
 
 SP_Enhanced(){
     TO_RMSD="${Ligand_name}"
     KEEP_NUM=`parse_num_or_percentage ${Docking_out_num}`
 cat<<SP >> ${Inp_Name}
-[STAGE:PRE_DOCK_SP]
+[STAGE:PRE_DOCK_${task}]
     STAGECLASS   gencodes.RecombineStage
     INPUTS   ${Ligand_name},
-    OUTPUTS   DOCK_SP_INPUT,
+    OUTPUTS   DOCK_${task}_INPUT,
     NUMOUT   njobs
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
     GENCODES   NO
     UNIQUEFIELD   s_vsw_compound_code
-[STAGE:DOCK_SP]
+[STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
-    INPUTS   DOCK_SP_INPUT, GRID
-    OUTPUTS   SP_OUT,
+    INPUTS   DOCK_${task}_INPUT, GRID
+    OUTPUTS   ${task}_SP_OUT,
     RECOMBINE   NO
     PRECISION   SP
     MAXKEEP 15000
@@ -1726,35 +1873,36 @@ cat<<SP >> ${Inp_Name}
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
     POSTDOCK   YES
-    POSTDOCKSTRAIN   NO
+    POSTDOCK_NPOSE  10
+    POSTDOCKSTRAIN   True
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS:$task]
-    USEROUTS   SP_OUT,
-    STRUCTOUT   SP_OUT
+[USEROUTS:${task}]
+    USEROUTS   ${task}_SP_OUT,
+    STRUCTOUT   ${task}_SP_OUT
 SP
-    Ligand_name="SP_OUT"
+    Ligand_name="${task}_SP_OUT"
 }
 
 SP_local(){
     TO_RMSD="${Ligand_name}"
     KEEP_NUM=`parse_num_or_percentage ${Docking_out_num}`
 cat<<SP >> ${Inp_Name}
-[STAGE:PRE_DOCK_SP]
+[STAGE:PRE_DOCK_${task}]
     STAGECLASS   gencodes.RecombineStage
     INPUTS   ${Ligand_name},
-    OUTPUTS   DOCK_SP_INPUT,
+    OUTPUTS   DOCK_${task}_INPUT,
     NUMOUT   njobs
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
     GENCODES   NO
     UNIQUEFIELD   s_vsw_compound_code
-[STAGE:DOCK_SP]
+[STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
-    INPUTS   DOCK_SP_INPUT, GRID
-    OUTPUTS   SP_OUT,
+    INPUTS   DOCK_${task}_INPUT, GRID
+    OUTPUTS   ${task}_SP_OUT,
     RECOMBINE   NO
     PRECISION   SP
     REWARD_INTRA_HBONDS YES
@@ -1774,35 +1922,35 @@ cat<<SP >> ${Inp_Name}
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
     POSTDOCK   YES
-    POSTDOCKSTRAIN   NO
+    POSTDOCKSTRAIN   True
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS:$task]
-    USEROUTS   SP_OUT,
-    STRUCTOUT   SP_OUT
+[USEROUTS:${task}]
+    USEROUTS   ${task}_SP_OUT,
+    STRUCTOUT   ${task}_SP_OUT
 SP
-    Ligand_name="SP_OUT"
+    Ligand_name="${task}_SP_OUT"
 }
 
 XP_Normal(){
     TO_RMSD="${Ligand_name}"
     KEEP_NUM=`parse_num_or_percentage ${Docking_out_num}`
 cat<<XP >> ${Inp_Name}
-[STAGE:PRE_DOCK_XP]
+[STAGE:PRE_DOCK_${task}]
     STAGECLASS   gencodes.RecombineStage
     INPUTS   ${Ligand_name},
-    OUTPUTS   DOCK_XP_INPUT,
+    OUTPUTS   DOCK_${task}_INPUT,
     NUMOUT   njobs
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
     GENCODES   NO
     UNIQUEFIELD   s_vsw_compound_code
-[STAGE:DOCK_XP]
+[STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
-    INPUTS   DOCK_XP_INPUT, GRID
-    OUTPUTS   XP_OUT,
+    INPUTS   DOCK_${task}_INPUT, GRID
+    OUTPUTS   ${task}_XP_OUT,
     RECOMBINE   NO
     PRECISION   XP
     MAXKEEP 10000
@@ -1825,31 +1973,31 @@ cat<<XP >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS:$task]
-    USEROUTS   XP_OUT,
-    STRUCTOUT   XP_OUT
+[USEROUTS:${task}]
+    USEROUTS   ${task}_XP_OUT,
+    STRUCTOUT   ${task}_XP_OUT
 XP
-    Ligand_name="XP_OUT"
+    Ligand_name="${task}_XP_OUT"
 }
 
 XP_ExtensionA(){
     TO_RMSD="${Ligand_name}"
     KEEP_NUM=`parse_num_or_percentage ${Docking_out_num}`
 cat<<XP >> ${Inp_Name}
-[STAGE:PRE_DOCK_XP]
+[STAGE:PRE_DOCK_${task}]
     STAGECLASS   gencodes.RecombineStage
     INPUTS   ${Ligand_name},
-    OUTPUTS   DOCK_XP_INPUT,
+    OUTPUTS   DOCK_${task}_INPUT,
     NUMOUT   njobs
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
     GENCODES   NO
     UNIQUEFIELD   s_vsw_compound_code
-[STAGE:DOCK_XP]
+[STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
-    INPUTS   DOCK_XP_INPUT, GRID
-    OUTPUTS   XP_OUT,
+    INPUTS   DOCK_${task}_INPUT, GRID
+    OUTPUTS   ${task}_XP_OUT,
     RECOMBINE   NO
     PRECISION   XP
     REWARD_INTRA_HBONDS YES
@@ -1870,35 +2018,36 @@ cat<<XP >> ${Inp_Name}
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
     POSTDOCK   YES
+    POSTDOCK_NPOSE  10
     POSTDOCKSTRAIN   NO
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS:$task]
-    USEROUTS   XP_OUT,
-    STRUCTOUT   XP_OUT
+[USEROUTS:${task}]
+    USEROUTS   ${task}_XP_OUT,
+    STRUCTOUT   ${task}_XP_OUT
 XP
-    Ligand_name="XP_OUT"
+    Ligand_name="${task}_XP_OUT"
 }
 
 XP_ExtensionB(){
     TO_RMSD="${Ligand_name}"
     KEEP_NUM=`parse_num_or_percentage ${Docking_out_num}`
 cat<<XP >> ${Inp_Name}
-[STAGE:PRE_DOCK_XP]
+[STAGE:PRE_DOCK_${task}]
     STAGECLASS   gencodes.RecombineStage
     INPUTS   ${Ligand_name},
-    OUTPUTS   DOCK_XP_INPUT,
+    OUTPUTS   DOCK_${task}_INPUT,
     NUMOUT   njobs
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
     GENCODES   NO
     UNIQUEFIELD   s_vsw_compound_code
-[STAGE:DOCK_XP]
+[STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
-    INPUTS   DOCK_XP_INPUT, GRID
-    OUTPUTS   XP_OUT,
+    INPUTS   DOCK_${task}_INPUT, GRID
+    OUTPUTS   ${task}_XP_OUT,
     RECOMBINE   NO
     PRECISION   XP
     REWARD_INTRA_HBONDS YES
@@ -1921,35 +2070,36 @@ cat<<XP >> ${Inp_Name}
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
     POSTDOCK   YES
-    POSTDOCKSTRAIN   NO
+    POSTDOCK_NPOSE  10
+    POSTDOCKSTRAIN   True
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS:$task]
-    USEROUTS   XP_OUT,
-    STRUCTOUT   XP_OUT
+[USEROUTS:${task}]
+    USEROUTS   ${task}_XP_OUT,
+    STRUCTOUT   ${task}_XP_OUT
 XP
-    Ligand_name="XP_OUT"
+    Ligand_name="${task}_XP_OUT"
 }
 
 XP_REF(){
     TO_RMSD="${Ligand_name}"
     KEEP_NUM=`parse_num_or_percentage ${Docking_out_num}`
 cat<<XP >> ${Inp_Name}
-[STAGE:PRE_DOCK_XP]
+[STAGE:PRE_DOCK_${task}]
     STAGECLASS   gencodes.RecombineStage
     INPUTS   ${Ligand_name},
-    OUTPUTS   DOCK_XP_INPUT,
+    OUTPUTS   DOCK_${task}_INPUT,
     NUMOUT   njobs
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
     GENCODES   NO
     UNIQUEFIELD   s_vsw_compound_code
-[STAGE:DOCK_XP]
+[STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
-    INPUTS   DOCK_XP_INPUT, GRID
-    OUTPUTS   XP_OUT,
+    INPUTS   DOCK_${task}_INPUT, GRID
+    OUTPUTS   ${task}_XP_OUT,
     RECOMBINE   NO
     PRECISION   XP
     REWARD_INTRA_HBONDS YES
@@ -1970,7 +2120,7 @@ cat<<XP >> ${Inp_Name}
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
     POSTDOCK   YES
-    POSTDOCKSTRAIN   NO
+    POSTDOCKSTRAIN   True
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
@@ -1981,31 +2131,31 @@ cat<<XP >> ${Inp_Name}
     CORE_SNAP   YES
     CORE_POS_MAX_RMSD   0.52
     CORECONS_FALLBACK   YES
-[USEROUTS:$task]
-    USEROUTS   XP_OUT,
-    STRUCTOUT   XP_OUT
+[USEROUTS:${task}]
+    USEROUTS   ${task}_XP_OUT,
+    STRUCTOUT   ${task}_XP_OUT
 XP
-    Ligand_name="XP_OUT"
+    Ligand_name="${task}_XP_OUT"
 }
 
 XP_Fragment(){
     TO_RMSD="${Ligand_name}"
     KEEP_NUM=`parse_num_or_percentage ${Docking_out_num}`
 cat<<XP >> ${Inp_Name}
-[STAGE:PRE_DOCK_XP]
+[STAGE:PRE_DOCK_${task}]
     STAGECLASS   gencodes.RecombineStage
     INPUTS   ${Ligand_name},
-    OUTPUTS   DOCK_XP_INPUT,
+    OUTPUTS   DOCK_${task}_INPUT,
     NUMOUT   njobs
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
     GENCODES   NO
     UNIQUEFIELD   s_vsw_compound_code
-[STAGE:DOCK_XP]
+[STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
-    INPUTS   DOCK_XP_INPUT, GRID
-    OUTPUTS   XP_OUT,
+    INPUTS   DOCK_${task}_INPUT, GRID
+    OUTPUTS   ${task}_XP_OUT,
     RECOMBINE   NO
     PRECISION   XP
     REWARD_INTRA_HBONDS YES
@@ -2031,31 +2181,31 @@ cat<<XP >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS:$task]
-    USEROUTS   XP_OUT,
-    STRUCTOUT   XP_OUT
+[USEROUTS:${task}]
+    USEROUTS   ${task}_XP_OUT,
+    STRUCTOUT   ${task}_XP_OUT
 XP
-    Ligand_name="XP_OUT"
+    Ligand_name="${task}_XP_OUT"
 }
 
 XP_Enhanced(){
     TO_RMSD="${Ligand_name}"
     KEEP_NUM=`parse_num_or_percentage ${Docking_out_num}`
 cat<<XP >> ${Inp_Name}
-[STAGE:PRE_DOCK_XP]
+[STAGE:PRE_DOCK_${task}]
     STAGECLASS   gencodes.RecombineStage
     INPUTS   ${Ligand_name},
-    OUTPUTS   DOCK_XP_INPUT,
+    OUTPUTS   DOCK_${task}_INPUT,
     NUMOUT   njobs
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
     GENCODES   NO
     UNIQUEFIELD   s_vsw_compound_code
-[STAGE:DOCK_XP]
+[STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
-    INPUTS   DOCK_XP_INPUT, GRID
-    OUTPUTS   XP_OUT,
+    INPUTS   DOCK_${task}_INPUT, GRID
+    OUTPUTS   ${task}_XP_OUT,
     RECOMBINE   NO
     PRECISION   XP
     REWARD_INTRA_HBONDS YES
@@ -2076,35 +2226,36 @@ cat<<XP >> ${Inp_Name}
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
     POSTDOCK   YES
-    POSTDOCKSTRAIN   NO
+    POSTDOCK_NPOSE  10
+    POSTDOCKSTRAIN   True
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS:$task]
-    USEROUTS   XP_OUT,
-    STRUCTOUT   XP_OUT
+[USEROUTS:${task}]
+    USEROUTS   ${task}_XP_OUT,
+    STRUCTOUT   ${task}_XP_OUT
 XP
-    Ligand_name="XP_OUT"
+    Ligand_name="${task}_XP_OUT"
 }
 
 XP_local(){
     TO_RMSD="${Ligand_name}"
     KEEP_NUM=`parse_num_or_percentage ${Docking_out_num}`
 cat<<XP >> ${Inp_Name}
-[STAGE:PRE_DOCK_XP]
+[STAGE:PRE_DOCK_${task}]
     STAGECLASS   gencodes.RecombineStage
     INPUTS   ${Ligand_name},
-    OUTPUTS   DOCK_XP_INPUT,
+    OUTPUTS   DOCK_${task}_INPUT,
     NUMOUT   njobs
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
     GENCODES   NO
     UNIQUEFIELD   s_vsw_compound_code
-[STAGE:DOCK_XP]
+[STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
-    INPUTS   DOCK_XP_INPUT, GRID
-    OUTPUTS   XP_OUT,
+    INPUTS   DOCK_${task}_INPUT, GRID
+    OUTPUTS   ${task}_XP_OUT,
     RECOMBINE   NO
     PRECISION   XP
     REWARD_INTRA_HBONDS YES
@@ -2125,293 +2276,453 @@ cat<<XP >> ${Inp_Name}
     AMIDE_MODE   penal
     POSE_OUTTYPE   PV
     POSTDOCK   YES
-    POSTDOCKSTRAIN   NO
+    POSTDOCKSTRAIN   True
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS:$task]
-    USEROUTS   XP_OUT,
-    STRUCTOUT   XP_OUT
+[USEROUTS:${task}]
+    USEROUTS   ${task}_XP_OUT,
+    STRUCTOUT   ${task}_XP_OUT
 XP
-    Ligand_name="XP_OUT"
+    Ligand_name="${task}_XP_OUT"
 }
 
 Linear_Tanimoto(){
 cat<<Cluster >> ${Inp_Name}
+[STAGE:PRE_CLUSTER]
+    STAGECLASS  gencodes.RecombineStage
+    INPUTS  ${Ligand_name},
+    NUMOUT  preserve
+    PRESERVE_NJOBS  TRUE
+    SKIP_BAD_LIGANDS    False
+    SKIP_RECEPTOR   TRUE
+    OUTPUTS     To_Cluster,
 [STAGE:Linear_Tanimoto]
     STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Linear
     SIMILARITY_METRIC    Tanimoto
-    ATOM_TYPING_SCHEME    12
-    INPUTS    ${Ligand_name},
+    ATOM_TYPING_SCHEME    9
+    INPUTS    To_Cluster,
     OUTPUTS    Linear_Tanimoto_Cluster_OUT,
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS    Linear_Tanimoto_Cluster_OUT,
     STRUCTOUT    Linear_Tanimoto_Cluster_OUT
 Cluster
 }
 Radial_Tanimoto(){
 cat<<Cluster >> ${Inp_Name}
+[STAGE:PRE_CLUSTER]
+    STAGECLASS  gencodes.RecombineStage
+    INPUTS  ${Ligand_name},
+    NUMOUT  preserve
+    PRESERVE_NJOBS  TRUE
+    SKIP_BAD_LIGANDS    False
+    SKIP_RECEPTOR   TRUE
+    OUTPUTS     To_Cluster,
 [STAGE:Radial_Tanimoto]
     STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Radial
     SIMILARITY_METRIC    Tanimoto
-    ATOM_TYPING_SCHEME    12
+    ATOM_TYPING_SCHEME    9
     INPUTS    ${Ligand_name},
     OUTPUTS    Radial_Tanimoto_Cluster_OUT,
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS    Radial_Tanimoto_Cluster_OUT,
     STRUCTOUT    Radial_Tanimoto_Cluster_OUT
 Cluster
 }
 MolPrint2D_Tanimoto(){
 cat<<Cluster >> ${Inp_Name}
+[STAGE:PRE_CLUSTER]
+    STAGECLASS  gencodes.RecombineStage
+    INPUTS  ${Ligand_name},
+    NUMOUT  preserve
+    PRESERVE_NJOBS  TRUE
+    SKIP_BAD_LIGANDS    False
+    SKIP_RECEPTOR   TRUE
+    OUTPUTS     To_Cluster,
 [STAGE:MolPrint2D_Tanimoto]
     STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    MolPrint2D
     SIMILARITY_METRIC    Tanimoto
-    ATOM_TYPING_SCHEME    12
+    ATOM_TYPING_SCHEME    9
     INPUTS    ${Ligand_name},
     OUTPUTS    MolPrint2D_Tanimoto_Cluster_OUT,
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS    MolPrint2D_Tanimoto_Cluster_OUT,
     STRUCTOUT    MolPrint2D_Tanimoto_Cluster_OUT
 Cluster
 }
 Topo_Tanimoto(){
 cat<<Cluster >> ${Inp_Name}
+[STAGE:PRE_CLUSTER]
+    STAGECLASS  gencodes.RecombineStage
+    INPUTS  ${Ligand_name},
+    NUMOUT  preserve
+    PRESERVE_NJOBS  TRUE
+    SKIP_BAD_LIGANDS    False
+    SKIP_RECEPTOR   TRUE
+    OUTPUTS     To_Cluster,
 [STAGE:Topo_Tanimoto]
     STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Topo
     SIMILARITY_METRIC    Tanimoto
-    ATOM_TYPING_SCHEME    12
+    ATOM_TYPING_SCHEME    9
     INPUTS    ${Ligand_name},
     OUTPUTS    Topo_Tanimoto_Cluster_OUT,
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS    Topo_Tanimoto_Cluster_OUT,
     STRUCTOUT    Topo_Tanimoto_Cluster_OUT
 Cluster
 }
 Dendritic_Tanimoto(){
 cat<<Cluster >> ${Inp_Name}
+[STAGE:PRE_CLUSTER]
+    STAGECLASS  gencodes.RecombineStage
+    INPUTS  ${Ligand_name},
+    NUMOUT  preserve
+    PRESERVE_NJOBS  TRUE
+    SKIP_BAD_LIGANDS    False
+    SKIP_RECEPTOR   TRUE
+    OUTPUTS     To_Cluster,
 [STAGE:Dendritic_Tanimoto]
     STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Dendritic
     SIMILARITY_METRIC    Tanimoto
-    ATOM_TYPING_SCHEME    12
+    ATOM_TYPING_SCHEME    9
     INPUTS    ${Ligand_name},
     OUTPUTS    Dendritic_Tanimoto_Cluster_OUT,
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS    Dendritic_Tanimoto_Cluster_OUT,
     STRUCTOUT    Dendritic_Tanimoto_Cluster_OUT
 Cluster
 }
 Linear_Euclidean(){
 cat<<Cluster >> ${Inp_Name}
+[STAGE:PRE_CLUSTER]
+    STAGECLASS  gencodes.RecombineStage
+    INPUTS  ${Ligand_name},
+    NUMOUT  preserve
+    PRESERVE_NJOBS  TRUE
+    SKIP_BAD_LIGANDS    False
+    SKIP_RECEPTOR   TRUE
+    OUTPUTS     To_Cluster,
 [STAGE:Linear_Euclidean]
     STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Linear
     SIMILARITY_METRIC    Euclidean
-    ATOM_TYPING_SCHEME    12
+    ATOM_TYPING_SCHEME    9
     INPUTS    ${Ligand_name},
     OUTPUTS    Linear_Euclidean_Cluster_OUT,
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS    Linear_Euclidean_Cluster_OUT,
     STRUCTOUT    Linear_Euclidean_Cluster_OUT
 Cluster
 }
 Radial_Euclidean(){
 cat<<Cluster >> ${Inp_Name}
+[STAGE:PRE_CLUSTER]
+    STAGECLASS  gencodes.RecombineStage
+    INPUTS  ${Ligand_name},
+    NUMOUT  preserve
+    PRESERVE_NJOBS  TRUE
+    SKIP_BAD_LIGANDS    False
+    SKIP_RECEPTOR   TRUE
+    OUTPUTS     To_Cluster,
 [STAGE:Radial_Euclidean]
     STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Radial
     SIMILARITY_METRIC    Euclidean
-    ATOM_TYPING_SCHEME    12
+    ATOM_TYPING_SCHEME    9
     INPUTS    ${Ligand_name},
     OUTPUTS    Radial_Euclidean_Cluster_OUT,
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS    Radial_Euclidean_Cluster_OUT,
     STRUCTOUT    Radial_Euclidean_Cluster_OUT
 Cluster
 }
 MolPrint2D_Euclidean(){
 cat<<Cluster >> ${Inp_Name}
+[STAGE:PRE_CLUSTER]
+    STAGECLASS  gencodes.RecombineStage
+    INPUTS  ${Ligand_name},
+    NUMOUT  preserve
+    PRESERVE_NJOBS  TRUE
+    SKIP_BAD_LIGANDS    False
+    SKIP_RECEPTOR   TRUE
+    OUTPUTS     To_Cluster,
 [STAGE:MolPrint2D_Euclidean]
     STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    MolPrint2D
     SIMILARITY_METRIC    Euclidean
-    ATOM_TYPING_SCHEME    12
+    ATOM_TYPING_SCHEME    9
     INPUTS    ${Ligand_name},
     OUTPUTS    MolPrint2D_Euclidean_Cluster_OUT,
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS    MolPrint2D_Euclidean_Cluster_OUT,
     STRUCTOUT    MolPrint2D_Euclidean_Cluster_OUT
 Cluster
 }
 Topo_Euclidean(){
 cat<<Cluster >> ${Inp_Name}
+[STAGE:PRE_CLUSTER]
+    STAGECLASS  gencodes.RecombineStage
+    INPUTS  ${Ligand_name},
+    NUMOUT  preserve
+    PRESERVE_NJOBS  TRUE
+    SKIP_BAD_LIGANDS    False
+    SKIP_RECEPTOR   TRUE
+    OUTPUTS     To_Cluster,
 [STAGE:Topo_Euclidean]
     STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Topo
     SIMILARITY_METRIC    Euclidean
-    ATOM_TYPING_SCHEME    12
+    ATOM_TYPING_SCHEME    9
     INPUTS    ${Ligand_name},
     OUTPUTS    Topo_Euclidean_Cluster_OUT,
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS    Topo_Euclidean_Cluster_OUT,
     STRUCTOUT    Topo_Euclidean_Cluster_OUT
 Cluster
 }
 Dendritic_Euclidean(){
 cat<<Cluster >> ${Inp_Name}
+[STAGE:PRE_CLUSTER]
+    STAGECLASS  gencodes.RecombineStage
+    INPUTS  ${Ligand_name},
+    NUMOUT  preserve
+    PRESERVE_NJOBS  TRUE
+    SKIP_BAD_LIGANDS    False
+    SKIP_RECEPTOR   TRUE
+    OUTPUTS     To_Cluster,
 [STAGE:Dendritic_Euclidean]
     STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Dendritic
     SIMILARITY_METRIC    Euclidean
-    ATOM_TYPING_SCHEME    12
+    ATOM_TYPING_SCHEME    9
     INPUTS    ${Ligand_name},
     OUTPUTS    Dendritic_Euclidean_Cluster_OUT,
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS    Dendritic_Euclidean_Cluster_OUT,
     STRUCTOUT    Dendritic_Euclidean_Cluster_OUT
 Cluster
 }
 Linear_Cosine(){
 cat<<Cluster >> ${Inp_Name}
+[STAGE:PRE_CLUSTER]
+    STAGECLASS  gencodes.RecombineStage
+    INPUTS  ${Ligand_name},
+    NUMOUT  preserve
+    PRESERVE_NJOBS  TRUE
+    SKIP_BAD_LIGANDS    False
+    SKIP_RECEPTOR   TRUE
+    OUTPUTS     To_Cluster,
 [STAGE:Linear_Cosine]
     STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Linear
     SIMILARITY_METRIC    Cosine
-    ATOM_TYPING_SCHEME    12
+    ATOM_TYPING_SCHEME    9
     INPUTS    ${Ligand_name},
     OUTPUTS    Linear_Cosine_Cluster_OUT,
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS    Linear_Cosine_Cluster_OUT,
     STRUCTOUT    Linear_Cosine_Cluster_OUT
 Cluster
 }
 Radial_Cosine(){
 cat<<Cluster >> ${Inp_Name}
+[STAGE:PRE_CLUSTER]
+    STAGECLASS  gencodes.RecombineStage
+    INPUTS  ${Ligand_name},
+    NUMOUT  preserve
+    PRESERVE_NJOBS  TRUE
+    SKIP_BAD_LIGANDS    False
+    SKIP_RECEPTOR   TRUE
+    OUTPUTS     To_Cluster,
 [STAGE:Radial_Cosine]
     STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Radial
     SIMILARITY_METRIC    Cosine
-    ATOM_TYPING_SCHEME    12
+    ATOM_TYPING_SCHEME    9
     INPUTS    ${Ligand_name},
     OUTPUTS    Radial_Cosine_Cluster_OUT,
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS    Radial_Cosine_Cluster_OUT,
     STRUCTOUT    Radial_Cosine_Cluster_OUT
 Cluster
 }
 MolPrint2D_Cosine(){
 cat<<Cluster >> ${Inp_Name}
+[STAGE:PRE_CLUSTER]
+    STAGECLASS  gencodes.RecombineStage
+    INPUTS  ${Ligand_name},
+    NUMOUT  preserve
+    PRESERVE_NJOBS  TRUE
+    SKIP_BAD_LIGANDS    False
+    SKIP_RECEPTOR   TRUE
+    OUTPUTS     To_Cluster,
 [STAGE:MolPrint2D_Cosine]
     STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    MolPrint2D
     SIMILARITY_METRIC    Cosine
-    ATOM_TYPING_SCHEME    12
+    ATOM_TYPING_SCHEME    9
     INPUTS    ${Ligand_name},
     OUTPUTS    MolPrint2D_Cosine_Cluster_OUT,
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS    MolPrint2D_Cosine_Cluster_OUT,
     STRUCTOUT    MolPrint2D_Cosine_Cluster_OUT
 Cluster
 }
 Topo_Cosine(){
 cat<<Cluster >> ${Inp_Name}
+[STAGE:PRE_CLUSTER]
+    STAGECLASS  gencodes.RecombineStage
+    INPUTS  ${Ligand_name},
+    NUMOUT  preserve
+    PRESERVE_NJOBS  TRUE
+    SKIP_BAD_LIGANDS    False
+    SKIP_RECEPTOR   TRUE
+    OUTPUTS     To_Cluster,
 [STAGE:Topo_Cosine]
     STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Topo
     SIMILARITY_METRIC    Cosine
-    ATOM_TYPING_SCHEME    12
+    ATOM_TYPING_SCHEME    9
     INPUTS    ${Ligand_name},
     OUTPUTS    Topo_Cosine_Cluster_OUT,
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS    Topo_Cosine_Cluster_OUT,
     STRUCTOUT    Topo_Cosine_Cluster_OUT
 Cluster
 }
 Dendritic_Cosine(){
 cat<<Cluster >> ${Inp_Name}
+[STAGE:PRE_CLUSTER]
+    STAGECLASS  gencodes.RecombineStage
+    INPUTS  ${Ligand_name},
+    NUMOUT  preserve
+    PRESERVE_NJOBS  TRUE
+    SKIP_BAD_LIGANDS    False
+    SKIP_RECEPTOR   TRUE
+    OUTPUTS     To_Cluster,
 [STAGE:Dendritic_Cosine]
     STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Dendritic
     SIMILARITY_METRIC    Cosine
-    ATOM_TYPING_SCHEME    12
+    ATOM_TYPING_SCHEME    9
     INPUTS    ${Ligand_name},
     OUTPUTS    Dendritic_Cosine_Cluster_OUT,
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS    Dendritic_Cosine_Cluster_OUT,
     STRUCTOUT    Dendritic_Cosine_Cluster_OUT
 Cluster
 }
 Linear_Soergel(){
 cat<<Cluster >> ${Inp_Name}
+[STAGE:PRE_CLUSTER]
+    STAGECLASS  gencodes.RecombineStage
+    INPUTS  ${Ligand_name},
+    NUMOUT  preserve
+    PRESERVE_NJOBS  TRUE
+    SKIP_BAD_LIGANDS    False
+    SKIP_RECEPTOR   TRUE
+    OUTPUTS     To_Cluster,
 [STAGE:Linear_Soergel]
     STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Linear
     SIMILARITY_METRIC    Soergel
-    ATOM_TYPING_SCHEME    12
+    ATOM_TYPING_SCHEME    9
     INPUTS    ${Ligand_name},
     OUTPUTS    Linear_Soergel_Cluster_OUT,
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS    Linear_Soergel_Cluster_OUT,
     STRUCTOUT    Linear_Soergel_Cluster_OUT
 Cluster
 }
 Radial_Soergel(){
 cat<<Cluster >> ${Inp_Name}
+[STAGE:PRE_CLUSTER]
+    STAGECLASS  gencodes.RecombineStage
+    INPUTS  ${Ligand_name},
+    NUMOUT  preserve
+    PRESERVE_NJOBS  TRUE
+    SKIP_BAD_LIGANDS    False
+    SKIP_RECEPTOR   TRUE
+    OUTPUTS     To_Cluster,
 [STAGE:Radial_Soergel]
     STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Radial
     SIMILARITY_METRIC    Soergel
-    ATOM_TYPING_SCHEME    12
+    ATOM_TYPING_SCHEME    9
     INPUTS    ${Ligand_name},
     OUTPUTS    Radial_Soergel_Cluster_OUT,
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS    Radial_Soergel_Cluster_OUT,
     STRUCTOUT    Radial_Soergel_Cluster_OUT
 Cluster
 }
 MolPrint2D_Soergel(){
 cat<<Cluster >> ${Inp_Name}
+[STAGE:PRE_CLUSTER]
+    STAGECLASS  gencodes.RecombineStage
+    INPUTS  ${Ligand_name},
+    NUMOUT  preserve
+    PRESERVE_NJOBS  TRUE
+    SKIP_BAD_LIGANDS    False
+    SKIP_RECEPTOR   TRUE
+    OUTPUTS     To_Cluster,
 [STAGE:MolPrint2D_Soergel]
     STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    MolPrint2D
     SIMILARITY_METRIC    Soergel
-    ATOM_TYPING_SCHEME    12
+    ATOM_TYPING_SCHEME    9
     INPUTS    ${Ligand_name},
     OUTPUTS    MolPrint2D_Soergel_Cluster_OUT,
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS    MolPrint2D_Soergel_Cluster_OUT,
     STRUCTOUT    MolPrint2D_Soergel_Cluster_OUT
 Cluster
 }
 Topo_Soergel(){
 cat<<Cluster >> ${Inp_Name}
+[STAGE:PRE_CLUSTER]
+    STAGECLASS  gencodes.RecombineStage
+    INPUTS  ${Ligand_name},
+    NUMOUT  preserve
+    PRESERVE_NJOBS  TRUE
+    SKIP_BAD_LIGANDS    False
+    SKIP_RECEPTOR   TRUE
+    OUTPUTS     To_Cluster,
 [STAGE:Topo_Soergel]
     STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Topo
     SIMILARITY_METRIC    Soergel
-    ATOM_TYPING_SCHEME    12
+    ATOM_TYPING_SCHEME    9
     INPUTS    ${Ligand_name},
     OUTPUTS    Topo_Soergel_Cluster_OUT,
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS    Topo_Soergel_Cluster_OUT,
     STRUCTOUT    Topo_Soergel_Cluster_OUT
 Cluster
 }
 Dendritic_Soergel(){
 cat<<Cluster >> ${Inp_Name}
+[STAGE:PRE_CLUSTER]
+    STAGECLASS  gencodes.RecombineStage
+    INPUTS  ${Ligand_name},
+    NUMOUT  preserve
+    PRESERVE_NJOBS  TRUE
+    SKIP_BAD_LIGANDS    False
+    SKIP_RECEPTOR   TRUE
+    OUTPUTS     To_Cluster,
 [STAGE:Dendritic_Soergel]
     STAGECLASS  canvas.Canvas2DSimilarityStage
     FINGERPRINT_TYPE    Dendritic
     SIMILARITY_METRIC    Soergel
-    ATOM_TYPING_SCHEME    12
+    ATOM_TYPING_SCHEME    9
     INPUTS    ${Ligand_name},
     OUTPUTS    Dendritic_Soergel_Cluster_OUT,
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS    Dendritic_Soergel_Cluster_OUT,
     STRUCTOUT    Dendritic_Soergel_Cluster_OUT
 Cluster
@@ -2422,7 +2733,7 @@ IFT(){
     PULL_NUM=`parse_num_or_percentage ${SET_PULL_NUM}`
     KEEP_NUM=`parse_num_or_percentage ${Docking_out_num}`
 cat<<IFT >> ${Inp_Name}
-[STAGE:PRE_DOCK_SP]
+[STAGE:${task}_PRE_DOCK_SP]
     STAGECLASS   gencodes.RecombineStage
     INPUTS   ${Ligand_name},
     OUTPUTS   DOCK_SP_INPUT,
@@ -2432,10 +2743,10 @@ cat<<IFT >> ${Inp_Name}
     MAX_SUBJOB_STS   5000
     GENCODES   NO
     UNIQUEFIELD   s_vsw_compound_code
-[STAGE:DOCK_SP]
+[STAGE:${task}_DOCK_SP]
     STAGECLASS   glide.DockingStage
     INPUTS   DOCK_SP_INPUT, GRID
-    OUTPUTS   SP_OUT,
+    OUTPUTS   ${task}_SP_OUT,
     RECOMBINE   NO
     PRECISION   SP
     REWARD_INTRA_HBONDS YES
@@ -2459,16 +2770,16 @@ cat<<IFT >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS:$task]
-    USEROUTS   SP_OUT,
-    STRUCTOUT   SP_OUT
-[STAGE:PULL_IFT]
+[USEROUTS:${task}]
+    USEROUTS   ${task}_SP_OUT,
+    STRUCTOUT   ${task}_SP_OUT
+[STAGE:${task}_PULL_IFT]
     STAGECLASS   pull.PullStage
-    INPUTS   SP_OUT, ${Ligand_name}
+    INPUTS   ${task}_SP_OUT, ${Ligand_name}
     OUTPUTS   TO_INDUCE_FIT,
     ${PULL_NUM}
     UNIQUEFIELD   s_m_title
-[STAGE:INDUCE_FIT]
+[STAGE:${task}_INDUCE_FIT]
     STAGECLASS  prime.PrimeStage
     INPUTS  TO_INDUCE_FIT
     OUTPUTS INDUCE_FIT_OUT
@@ -2480,7 +2791,7 @@ cat<<IFT >> ${Inp_Name}
     NUMBER_OF_PASSES    1
     MINIM_NITER 5
     MINIM_RMSG  0.01
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   INDUCE_FIT_OUT,
     STRUCTOUT   INDUCE_FIT_OUT
 IFT
@@ -2506,7 +2817,7 @@ cat<<MMGBSA_EN >> ${Inp_Name}
     OUTPUT_LIG_STRAING  True
     OPLS_VERSION    ${Force_Field}
     USE_MAE_CHARGES True
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   MMGBSA_EN_OUT,
     STRUCTOUT   MMGBSA_EN_OUT
 MMGBSA_EN
@@ -2537,7 +2848,7 @@ cat<<MMGBSA_MIN >> ${Inp_Name}
     NUMBER_OF_PASSES    2
     MINIM_NITER 2
     MINIM_RMSG  0.01
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   MMGBSA_MIN_OUT,
     STRUCTOUT   MMGBSA_MIN_OUT
 [STAGE:MMGBSA_EN]
@@ -2549,7 +2860,7 @@ cat<<MMGBSA_MIN >> ${Inp_Name}
     OUTPUT_LIG_STRAING  True
     OPLS_VERSION    ${Force_Field}
     USE_MAE_CHARGES True
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   MMGBSA_MIN_OUT,
     STRUCTOUT   MMGBSA_MIN_OUT
 MMGBSA_MIN
@@ -2579,7 +2890,7 @@ cat<<MMGBSA_OPT >> ${Inp_Name}
     FLEXDIST    5.0
     NUMBER_OF_PASSES    2
     NITER_SIDE  8
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   MMGBSA_OPT_OUT,
     STRUCTOUT   MMGBSA_OPT_OUT
 [STAGE:MMGBSA_EN]
@@ -2591,7 +2902,7 @@ cat<<MMGBSA_OPT >> ${Inp_Name}
     OUTPUT_LIG_STRAING  True
     USE_MAE_CHARGES True
     OPLS_VERSION    ${Force_Field}
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   MMGBSA_MIN_OUT,
     STRUCTOUT   MMGBSA_MIN_OUT
 MMGBSA_OPT
@@ -2625,7 +2936,7 @@ cat<<QMMM >> ${Inp_Name}
     QM_DFTNAME  ${DFTname}
     QM_BASIS    ${Basisname}
     MM_FORCEFIELD   ${Force_Field}
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   QMMM_OUT,
     STRUCTOUT   QMMM_OUT
 QMMM
@@ -2636,13 +2947,13 @@ QM_redock(){
     TO_RMSD="${Ligand_name}"
     PULL_NUM=`parse_num_or_percentage ${SET_PULL_NUM}`
 cat<<QMMM >> ${Inp_Name}
-[STAGE:PULL_SELF]
+[STAGE:${task}_PULL_SELF]
     STAGECLASS   pull.PullStage
     INPUTS   ${Ligand_name}, ${Ligand_name}
     OUTPUTS   PULL_SELF_OUT,
     ${PULL_NUM}
     UNIQUEFIELD   s_m_title
-[STAGE:QMMM]
+[STAGE:${task}_QMMM]
     STAGECLASS  qsite.QSiteStage
     INPUTS   PULL_SELF_OUT
     OUTPUTS   QMMM_OUT,
@@ -2651,7 +2962,7 @@ cat<<QMMM >> ${Inp_Name}
     QM_DFTNAME  ${DFTname}
     QM_BASIS    ${Basisname}
     MM_FORCEFIELD   ${Force_Field}
-[STAGE:PRE_DOCK_SP]
+[STAGE:${task}_PRE_DOCK_SP]
     STAGECLASS   gencodes.RecombineStage
     INPUTS   QMMM_OUT,
     OUTPUTS   DOCK_QMSP_INPUT,
@@ -2661,7 +2972,7 @@ cat<<QMMM >> ${Inp_Name}
     MAX_SUBJOB_STS   5000
     GENCODES   NO
     UNIQUEFIELD   s_vsw_compound_code
-[STAGE:DOCK_SP]
+[STAGE:${task}_DOCK_SP]
     STAGECLASS   glide.DockingStage
     INPUTS   DOCK_QMSP_INPUT, GRID
     OUTPUTS   QMSP_OUT,
@@ -2689,7 +3000,7 @@ cat<<QMMM >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   QMSP_OUT,
     STRUCTOUT   QMSP_OUT
 QMMM
@@ -2729,7 +3040,7 @@ cat<<CDD >> ${Inp_Name}
     NUMBER_OF_PASSES    3
     MINIM_NITER 6
     MINIM_RMSG  0.01
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   COV_REFINE_OUT,
     STRUCTOUT   COV_REFINE_OUT
 CDD
@@ -2754,7 +3065,7 @@ cat<<CDD >> ${Inp_Name}
     NUMBER_OF_PASSES    3
     MINIM_NITER 6
     MINIM_RMSG  0.01
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   COV_REFINE_OUT,
     STRUCTOUT   COV_REFINE_OUT
 CDD
@@ -2771,7 +3082,7 @@ cat<<RMSD >>${Inp_Name}
     INPUT   ${TO_RMSD},${Ligand_name}
     OUTPUTS RMSD_OUT
     UNIQUEFIELD  s_m_title
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   RMSD_OUT,
     STRUCTOUT   RMSD_OUT
 RMSD
@@ -2784,6 +3095,9 @@ PhaseShape(){
     atomtypes=${shape_screen_Array[1]}
     shape_sample_method=${shape_screen_Array[2]}
     max_confs=${shape_screen_Array[3]}
+    if [ ${Reference_Ligand:-5} == "phypo" ];then
+        atomtypes="pharm"
+    fi
 cat<<Shape >>${Inp_Name}
 [STAGE:PhaseShape]
     STAGECLASS  phase.PhaseShapeStage
@@ -2791,10 +3105,11 @@ cat<<Shape >>${Inp_Name}
     OUTPUTS   Shape_OUT
     ATOM_TYPES  ${atomtypes}
     MAX_CONFS   ${max_confs}
+    SHAPE_REF_LIGAND_FILE   ${Reference_Ligand}
     EXISTING_CONFS  keep
     CONFS_PER_BOND  12
     AMIDE_MODE  trans
-[USEROUTS:$task]
+[USEROUTS:${task}]
     USEROUTS   Shape_OUT,
     STRUCTOUT   Shape_OUT
 Shape
@@ -2802,7 +3117,7 @@ Shape
     echo "NOTE: Shape Sreening in Pipeline!"
 }
 
-Shape(){
+localShape(){
     keep_num=${shape_screen_Array[0]}
     atomtypes=${shape_screen_Array[1]}
     shape_sample_method=${shape_screen_Array[2]}
@@ -2812,21 +3127,32 @@ Shape(){
     elif [ ${Database_Location##*.} == "mae" ] || [ ${Database_Location##*.} == "maegz" ] || [ ${Database_Location##*.} == "sdf" ];then
         shape_screen_database=${Database_Location}
     elif [ -d ${Database_Location} ]; then
+        > ${Database}.list
         for file in `ls ${Database_Location}`;do
             if [ ${file##*.} == "mae" ] || [ ${file##*.} == "maegz" ] || [ ${file##*.} == "sdf" ];then
-                ls ${Database_Location} >> ${Database}.filelist
+                cp ${Database_Location}/${file} ./
+                echo "${file}" >> ${Database}.list
             else
                 echo "Warning: Your input ${Database_Location}/${file} is not recognized."
             fi
         done
-        shape_screen_database="${Database}.filelist"
+        shape_screen_database="${Database}.list"
     else
         echo "Your input ${Database_Location} is not recognized."
         exit
     fi
-    $SCHRODINGER/shape_screen -shape ${Reference_Ligand} -screen ${shape_screen_database} -proj -JOB shape_screen_using_$(basename ${Reference_Ligand}) -verbose -advance -sort -keep ${keep_num} -atomtypes ${atomtypes} -sample ${shape_sample_method} -max ${max_confs} -WAIT -HOST "${HOST}:${Njobs}" -TMPLAUNCHDIR
-    Database_Location=${PWD}/shape_screen_using_$(basename ${Reference_Ligand})_align.maegz
-    echo "NOTE: Shape Sreening Done!"
+    if [ ${Reference_Ligand:-5} == "phypo" ];then
+        pharm_prefer_paramters=" -proj -pharm "
+    fi
+    if [ ${Pipeline:-10} == "localShape" ] && [ ${Pipeline:0:10} == "localShape" ];then
+        $SCHRODINGER/shape_screen -shape ${Reference_Ligand} -screen ${shape_screen_database} ${pharm_prefer_paramters} -JOB shape_screen_using_$(basename ${Reference_Ligand}) -sort -keep ${keep_num} -atomtypes ${atomtypes} -sample ${shape_sample_method} -max ${max_confs} -HOST "${HOST}:${Njobs}" -TMPLAUNCHDIR
+        echo "NOTE: Shape Sreening Submmited!"
+        exit
+    else
+        $SCHRODINGER/shape_screen -shape ${Reference_Ligand} -screen ${shape_screen_database} ${pharm_prefer_paramters} -JOB shape_screen_using_$(basename ${Reference_Ligand}) -sort -keep ${keep_num} -atomtypes ${atomtypes} -sample ${shape_sample_method} -max ${max_confs} -WAIT -HOST "${HOST}:${Njobs}" -TMPLAUNCHDIR
+        Database_Location=${PWD}/shape_screen_using_$(basename ${Reference_Ligand})_align.maegz
+        echo "NOTE: Shape Sreening Done!"
+    fi
 }
 
 generate_INP(){
@@ -2843,8 +3169,8 @@ generate_INP(){
         SMARTs
     fi
     for task in ${Pipeline_array[@]};do
-        $task 
-        echo "NOTE: Set up $task Task!"
+        ${task} 
+        echo "NOTE: Set up ${task} Task!"
     done
 }
 
@@ -2858,10 +3184,17 @@ do
     Inp_Name="${Job_Title}.inp"
     cd ${Job_Title}
     generate_INP #accept $Inp_Name
+    #############
+    ##  -REMOTEDRIVER maybe lost the output maegz file of last step.
+    #############
     if [ $HOST == "localhost" ]; then
-        $SCHRODINGER/run pipeline_startup.py ${Inp_Name} -OVERWRITE -adjust -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -JOBNAME ${Job_Title} -host_glide "${HOST}:${Glide}" -host_ligprep "${HOST}:${LigPrep}" -host_phase "${HOST}:${Phase}" -host_prime "${HOST}:${Prime}" -host_mmod "${HOST}:${MACROMODEL}" -host_qsite "${HOST}:${Qsite}" -host_qikprop "${HOST}:${QIKPROP}" -TMPLAUNCHDIR -WAIT
+        #$SCHRODINGER/run pipeline_startup.py ${Inp_Name} -OVERWRITE -adjust -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -JOBNAME ${Job_Title} -host_glide "${HOST}:${Glide}" -host_ligprep "${HOST}:${LigPrep}" -host_phase "${HOST}:${Phase}" -host_prime "${HOST}:${Prime}" -host_mmod "${HOST}:${MACROMODEL}" -host_qsite "${HOST}:${Qsite}" -host_qikprop "${HOST}:${QIKPROP}" -TMPLAUNCHDIR -WAIT
+        $SCHRODINGER/pipeline -OVERWRITE -TMPLAUNCHDIR -adjust -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -JOBNAME ${Job_Title} -host_glide "${HOST}:${Glide}" -host_ligprep "${HOST}:${LigPrep}" -host_phase "${HOST}:${Phase}" -host_prime "${HOST}:${Prime}" -host_mmod "${HOST}:${MACROMODEL}" -host_qsite "${HOST}:${Qsite}" -host_qikprop "${HOST}:${QIKPROP}" -WAIT -no_cleanup ${Inp_Name}
+        #$SCHRODINGER/vsw -OVERWRITE -TMPLAUNCHDIR -adjust -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -JOBNAME ${Job_Title} -host_glide "${HOST}:${Glide}" -host_ligprep "${HOST}:${LigPrep}" -host_phase "${HOST}:${Phase}" -host_prime "${HOST}:${Prime}" -host_mmod "${HOST}:${MACROMODEL}" -host_qsite "${HOST}:${Qsite}" -host_qikprop "${HOST}:${QIKPROP}" -WAIT ${Inp_Name}
     else
-        $SCHRODINGER/run pipeline_startup.py ${Inp_Name} -OVERWRITE -adjust -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -JOBNAME ${Job_Title} -host_glide "${HOST}:${Glide}" -host_ligprep "${HOST}:${LigPrep}" -host_phase "${HOST}:${Phase}" -host_prime "${HOST}:${Prime}" -host_mmod "${HOST}:${MACROMODEL}" -host_qsite "${HOST}:${Qsite}" -host_qikprop "${HOST}:${QIKPROP}" -TMPLAUNCHDIR
+        #$SCHRODINGER/run pipeline_startup.py ${Inp_Name} -OVERWRITE -adjust -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -JOBNAME ${Job_Title} -host_glide "${HOST}:${Glide}" -host_ligprep "${HOST}:${LigPrep}" -host_phase "${HOST}:${Phase}" -host_prime "${HOST}:${Prime}" -host_mmod "${HOST}:${MACROMODEL}" -host_qsite "${HOST}:${Qsite}" -host_qikprop "${HOST}:${QIKPROP}" -TMPLAUNCHDIR
+        $SCHRODINGER/pipeline -OVERWRITE -TMPLAUNCHDIR -adjust -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -JOBNAME ${Job_Title} -host_glide "${HOST}:${Glide}" -host_ligprep "${HOST}:${LigPrep}" -host_phase "${HOST}:${Phase}" -host_prime "${HOST}:${Prime}" -host_mmod "${HOST}:${MACROMODEL}" -host_qsite "${HOST}:${Qsite}" -host_qikprop "${HOST}:${QIKPROP}" -no_cleanup ${Inp_Name}
+        #$SCHRODINGER/vsw -OVERWRITE -TMPLAUNCHDIR -adjust -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -JOBNAME ${Job_Title} -host_glide "${HOST}:${Glide}" -host_ligprep "${HOST}:${LigPrep}" -host_phase "${HOST}:${Phase}" -host_prime "${HOST}:${Prime}" -host_mmod "${HOST}:${MACROMODEL}" -host_qsite "${HOST}:${Qsite}" -host_qikprop "${HOST}:${QIKPROP}" -REMOTEDRIVER ${Inp_Name}
     fi
     cd ..
 done

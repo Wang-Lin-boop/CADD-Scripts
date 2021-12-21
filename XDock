@@ -1,6 +1,6 @@
 #!/bin/bash
 #########################################################################
-# XDock, Version 1.3.0
+# XDock, Version 1.4.5
 # 2021, ShanghaiTech University, Wang Lin
 # Email: wanglin3@shanghaitech.edu.cn
 #########################################################################
@@ -13,9 +13,11 @@
     Peptide_Segment=false
     Peptide_Length=12
     Peptide_Stepwise=5
+    cap="-z"
     
     # Job Control
     Mode="SITEMAP"
+    ligand_asl="first ligand detected"
 
     ligPrep="epik"
     ProPrep="rough"
@@ -28,11 +30,14 @@
     Docking=true
     Induce_Fit=false
     Grid_in=false
+    GRIDGEN_PEPTIDE=false
     
     Grid_Center=""
     Site_Num=2
     Pose_Num=1
+    DOCKING_METHOD="confgen"
     PRECISION="SP"
+    strain_correction=TRUE
     OUT_com=1
     Prime=10
     Ligand_ASL="A:999"
@@ -40,19 +45,18 @@
     Distance=5.0
     SAMPLING=1
     MAXKEEP=5000
-    scalingVdW=1.0
+    scalingVdW=0.9
 
     box_inner=12
     Box_Buffer=5
 
-    Peptide_docking=false
     rosetta_version=mpi
 
     VAILD_PRECISION=("SP" "XP" "HTVS")
     VAILD_FF=("OPLS4" "OPLS3e" "OPLS3" "OPLS_2005")
 
     #Host and Schrodinger Path
-    HOST=HPC_CPU
+    HOST=CPU
     Njobs=50
     
     SCHRODINGER=${SCHRODINGER}
@@ -89,7 +93,9 @@ Input parameter:
   -P	Path to Protein Library.
   -L    Ligand File or Library, in *.pdb, *.sdf, *.mae or *.maegz formats.
   -d    Segment proteins in Ligand File or Library to Peptides, Ligand File must be pdb format. <12:5>
-            -d "12:5" means: length for each peptides is 15 aa, and Segmentation stepwise is 5 aa.
+            -d "12:5" means: length for each peptides is 12 aa, and Segmentation stepwise is 5 aa.
+            use "-0" to stop pipeline after peptide segmentation. The results will save into dir "Peptides_Lib".
+  -f    Peptide Fasta file. use "-c" to cap peptides.
 
 XDock control parameter:
   -l    Ligands prepared mode, default is false, use "-l true" to open the ligand preparation process. <epik>
@@ -106,31 +112,34 @@ XDock control parameter:
             mini: hopt + constrained minimaztion.
         NOTE: if return a error "File does not exist" after preparation, replace "sys.exit(1)" in $SCHRODINGER/mmshare-v5.5/python/common/xglide.py at 1411 line to "continue".
   -m    XDock Mode: <SITEMAP>
-            SITEMAP: Only protein pocket identifed by SiteMap, SP Docking.
+            SITEMAP: Only protein pocket identifed by SiteMap.
                 Change the number of Grid files per protein generated using Sitemap by "-s <num>", default is 2.
             Native: re-dock the ligand in input complex.
-            COMPD: Ligand position of protein-ligand complex, SP Docking.
+            COMPD: proket defined by protein-ligand complex, associated with -a.
             GCD: User Defined Grid center, SP Docking.
                 Define pocket by Provided Grid center Coordinate, e.g. "-g 153.00, 65.023, 24.003".
             SiteMapGrid: Grid Generation by SiteMap.
-            ComplexGrid: Grid Generation by Ligand position of Complex Structure.
+            ComplexGrid: Grid Generation by Ligand position of Complex Structure, associated with -a.
             CenterGrid: Grid Generation by center Coordinate.
             Dock: Docking by input girds in Protein Library.
             COMPI: Ligand position of protein-ligand complex, Induce Fit Docking.
             GCI: User Defined Grid center, Induce Fit Docking.
-                Define pocket by Provided Grid center Coordinate, e.g. "-g 153.00, 65.023, 24.003".
+                Define pocket by Provided Grid center Coordinate, e.g. -g "153.00, 65.023, 24.003".
+  -a    Ligand ASL for COMPD or ComplexGrid Mode, default is the first ligand detected. <$ligand_asl>
 
-  -v    scalingVdW, reducing this value and collocating with MMGBSA refine to induce receptor fit ligands. 0.5 is OK. <1.0>
+  -v    scalingVdW, reducing this value and collocating with MMGBSA refine to induce receptor fit ligands. 0.5 is OK. <${scalingVdW}>
   -g    Only the grid center Coordinate will be considered.
             Define a grid center Coordinate to docking, additionally. Such as "153.00, 65.023, 24.003".
   -s    The number of Grid files per protein generated using Sitemap. <2>
   -n    Number of pose per ligand. <1>
   -o    Number of Top Complexes to Output for per protein. <1>
+            NOTE: It is recommended that "-o = -n * number of ligands". 
   -x    The PRECISION of Docking, SP, XP and HTVS are supported. Default is SP.
   -A    Reference Ligand ASL to induce Fit Docking. Such as: "A:999"
   -D    residues within the specified distance will be set to flexible in Induce Fit Docking. default is 5.0 Å.
   -F    Force Field in Docking, OPLS_2005, OPLS3e or OPLS4.
   -e    Enchanced Sampling.
+  -w    Refining ligand conformation in-place at docking stage.
   -t    Peptide docking, if your ligands is peptides, please use -t. Default is turn off.
   -i    Inner Box size. The space for ligand centroid motion. <12>
   -b    Box Outer buffer, reducing this value increases sampling efficiency but may fall into local minimization. <5>
@@ -138,7 +147,7 @@ XDock control parameter:
 
 Job control:
   -T    Set a Job Title. <Mode>
-  -H	Hostname of your queue, defult is HPC_CPU.
+  -H	Hostname of your queue, defult is ${HOST}.
   -N    The number of threads you want to use in this task. No more than 100. <50>
   -r    The number of Prime License you had. <10>
   -S	Your Schrodinger path. <$SCHRODINGER>
@@ -150,7 +159,16 @@ Thank you for your using, If you found any problem, Please contact wanglin3@shan
 HELP
 }
 
-while getopts ":hP:L:l:p:H:N:S:g:s:m:n:o:x:A:F:D:r:R:B:ev:tV:d:b:i:T:" opt
+check_inp(){
+    inp_file_to_checking=$1
+    receptor_line_num=`egrep "RECEPTOR|GRID|COMPLEX" ${inp_file_to_checking} | wc -l`
+    if [ $receptor_line_num -lt 1 ];then
+        echo "No RECEPTOR in inp file, please check your -P and -m Option!"
+        exit
+    fi
+}
+
+while getopts ":hP:L:l:p:H:N:S:g:s:m:a:n:o:x:A:F:D:r:R:B:ewv:tV:d:b:i:T:f:u0" opt
 do
   case $opt in
     h)
@@ -175,15 +193,23 @@ do
     d)
         Peptide_Segment=true
         Segment_array=(${OPTARG//:/ })
-        Peptide_Length=${Segment_array[0]}
-        Peptide_Stepwise=${Segment_array[1]}
+        export Peptide_Length=${Segment_array[0]}
+        export Peptide_Stepwise=${Segment_array[1]}
         ;;
+    0)
+        only_peptide_Segment=true;;
+    f)
+        Peptide_fasta=$OPTARG;;
+    c)
+        cap="-c";;
     l)
         ligPrep=$OPTARG;;
     p)
         ProPrep=$OPTARG;;
     m)
         Mode=$OPTARG;;
+    a)
+        ligand_asl=$OPTARG;;
     v)
         scalingVdW=$OPTARG;;
     i)
@@ -211,10 +237,15 @@ do
     e)
         SAMPLING=3
         MAXKEEP=15000;;
+    w)
+        DOCKING_METHOD="mininplace";;
     t)
-        Peptide_docking=true;;
+        Docking=peptide
+        GRIDGEN_PEPTIDE=true;;
     T)
         Job_Title=$OPTARG;;
+    u)
+        strain_correction=FALSE;;
     ?)
         echo ""
         echo "Error: Do not use undefined options."
@@ -263,7 +294,7 @@ Mode: ${Mode}
 Inputted Proteins: ${Protein_Input}
 Inputted Ligands: ${Ligand_Input}
 Protein Preparation: ${ProPrep}
-SiteMap: ${Site_Num}
+
 Flexible Docking: ${Docking}
 Induce Fit Docking: ${Induce_Fit}
 
@@ -272,7 +303,6 @@ OUTPUTLOG
 if [ ${Peptide_Segment} == "true" ];then
     mkdir -p Peptides_Lib
 cat << SEGMENT > Segment.jl
-#!/mnt/g/julia-1.4.2/bin/julia
 using BioStructures
 
 function splitPeptide(file,length,step)
@@ -309,7 +339,7 @@ function splitPeptide(file,length,step)
                     end
                     peptide = collectresidues(chain, res -> stratpoint <= resnumber(res) < endpoint)
                     println("Residues form ",stratpoint," to ",endpoint," of ",filename,"-model_",modelname,"-chain_",chainname," has been split out.")
-                    writepdb("$filename-$modelname-$chainname-$stratpoint-$endpoint.pdb",peptide)
+                    writepdb("\$filename-\$modelname-\$chainname-\$stratpoint-\$endpoint.pdb",peptide)
                     stratpoint=stratpoint+step
                     endpoint=endpoint+step
                 end
@@ -317,25 +347,38 @@ function splitPeptide(file,length,step)
     end    
 end
 
-function main()
-    print("What's your inputfile?\n")
-    const fileinput=readline(stdin)
-    print("Define a length for each peptide:\n")
-    const peptidelength=parse(Int,readline(stdin))
-    print("Specify a step size for peptide:\n")
-    const stepsize=parse(Int,readline(stdin))
-    splitPeptide(fileinput,peptidelength,stepsize)
-end
-
-main()
+print("What's your inputfile?\n")
+fileinput=readline(stdin)
+print("Define a length for each peptide:\n")
+peptidelength=parse(Int,readline(stdin))
+print("Specify a step size for peptide:\n")
+stepsize=parse(Int,readline(stdin))
+splitPeptide(fileinput,peptidelength,stepsize)
 SEGMENT
     function Segment_peptides(){
-        ( echo "$1"; echo "$Peptide_Length"; echo "$Peptide_Stepwise" ) | julia Segment.jl
+        echo "File segment to peptides: $1, Peptide_Length: $Peptide_Length, Peptide_Stepwise: $Peptide_Stepwise"
+        ( echo "$1"; echo "$Peptide_Length"; echo "$Peptide_Stepwise" ) | julia ../Segment.jl
     }; export -f Segment_peptides
     cd Peptides_Lib
-    echo "Warning: Only pdb file in Protein Library will be considered when you trun on the -d option!"
-    ls ${Ligand_Input} | grep pdb$ | parallel -j $Njobs Segment_peptides ${Ligand_Input}/{}
+    echo "Warning: Only pdb file in Ligand Library will be considered when you trun on the -d option!"
+    if [ -d ${Ligand_Input} ];then
+        ls ${Ligand_Input} | grep pdb$ | parallel -j $Njobs Segment_peptides ${Ligand_Input}/{}
+    elif [ -f ${Ligand_Input} ];then
+        Segment_peptides ${Ligand_Input}
+    fi
+    if [ ${only_peptide_Segment} == "true" ];then
+        echo "
+        NOTE: Peptides were saved into dir Peptides_Lib.
+        "
+        exit
+    fi
     cd ..
+    Ligand_Input="../Peptides_Lib"
+fi
+
+if [ $Peptide_fasta ];then
+    mkdir -p Peptides_lib
+    $SCHRODINGER/run build_peptide.py $Peptide_fasta Peptides_lib/Peptides_lib.maegz -f ${Peptide_fasta} ${cap} -s "Extended"
     Ligand_Input="Peptides_Lib"
 fi
 
@@ -499,7 +542,7 @@ mkdir -p ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input})
 Job_Dir=${PWD}
 cd ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input})
 if [ ! ${Job_Title} ];then
-    Job_Title=${Mode}
+    Job_Title=${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input})-XDOCK
 fi
 
 # Xglide Module
@@ -509,10 +552,17 @@ cat<<INP0 > ${Job_Title}.inp
 #Job Dic.: ${Job_Dir}
 #Protein Lib: ${Protein_to_DOCK}
 #Ligand Input: ${Ligand_Input}
+########################################
+# ${SCHRODINGER}/run xglide.py -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -verbose -DRIVERHOST "${HOST}"  -TMPLAUNCHDIR  ${Job_Title}.inp
+########################################
 INP0
 
 if [ $By_Complex == "true" ];then
-    echo "COMPLEX       ${Protein_to_DOCK}" >>  ${Job_Title}.inp
+    if [ "${ligand_asl}" == "first ligand detected" ];then
+        echo "COMPLEX       ${Protein_to_DOCK}" >>  ${Job_Title}.inp
+    else
+        echo "COMPLEX       ${Protein_to_DOCK},${ligand_asl}" >>  ${Job_Title}.inp
+    fi
 fi
 
 if [ $By_SiteMap == "true" ];then
@@ -525,14 +575,16 @@ if [ $By_SiteMap == "true" ];then
 fi
 
 if [ $By_Center == "true" ];then
+    GRIDGEN_OUTERBOX_BY_Center=`awk 'BEGIN{print "'"$box_inner"'" + "'"$Box_Buffer"'" + 12}'`
     echo "RECEPTOR       ${Protein_to_DOCK}" >>  ${Job_Title}.inp
     echo "SITEMAP       FALSE" >>  ${Job_Title}.inp
     echo "GRIDGEN_GRID_CENTER      ${Grid_Center}" >>  ${Job_Title}.inp
+    echo "GRIDGEN_OUTERBOX       ${GRIDGEN_OUTERBOX_BY_Center}, ${GRIDGEN_OUTERBOX_BY_Center}, ${GRIDGEN_OUTERBOX_BY_Center}" >>  ${Job_Title}.inp
 fi
 
 if [ $Grid_in == "true" ];then
-    for grd in `ls ${Protein_to_DOCK} | grep "grd$|zip$"`;do
-        echo "GRID      ${grd},-1" >>  ${Job_Title}.inp
+    for grd in `ls ${Protein_to_DOCK} | grep -E "grd$|zip$"`;do
+        echo "GRID      ${Protein_to_DOCK}/${grd},-1" >>  ${Job_Title}.inp
     done 
 else
 cat<<INP1 >>  ${Job_Title}.inp
@@ -544,20 +596,25 @@ PPREP_PROTASSIGN_EXHAUSTIVE     ${PPREP_PROTASSIGN_EXHAUSTIVE}
 PPREP_IMPREF        ${PPREP_IMPREF}
 PPREP_IMPREF_RMSD   ${PPREP_IMPREF_RMSD}
 PPREP_WATERDIST     ${PPREP_WATERDIST}
+GRIDGEN_INNERBOX        ${box_inner}
+GRIDGEN_OUTERBOX_BUFFER     ${Box_Buffer}
+GRIDGEN_RECEP_VSCALE    ${scalingVdW}
+GRIDGEN_PEPTIDE     ${GRIDGEN_PEPTIDE}
+GRIDGEN_FORCEFIELD      ${Force_Field}
+GRIDGEN_OUTPUTDIR    .
+INP1
+fi
+
+cat<<INP1 >>  ${Job_Title}.inp
 LIGAND      ${Ligand_Input}
 MAXLIGATOMS     300
 LIGPREP     ${LIGPREP}
 LIGPREP_EPIK    ${LIGPREP_EPIK}
-GRIDGEN_INNERBOX        ${box_inner}
-GRIDGEN_OUTERBOX_BUFFER     ${Box_Buffer}
-GRIDGEN_RECEP_VSCALE    ${scalingVdW}
-GRIDGEN_PEPTIDE     ${Peptide_docking}
-GRIDGEN_FORCEFIELD      ${Force_Field}
 INP1
-fi
 
 if [ $Docking == "true" ];then
 cat<<INP2 >>  ${Job_Title}.inp
+DOCK_DOCKING_METHOD ${DOCKING_METHOD}
 DOCK_PRECISION      ${PRECISION}
 DOCK_LIG_VSCALE     ${scalingVdW}
 DOCK_POSES_PER_LIG      ${Pose_Num}
@@ -566,8 +623,29 @@ GENERATE_TOP_COMPLEXES      ${OUT_com}
 DOCK_NENHANCED_SAMPLING     ${SAMPLING}
 DOCK_FORCEFIELD      ${Force_Field}
 DOCK_MAXKEEP    ${MAXKEEP}
-DOCK_PEPTIDE    ${Peptide_docking}
+DOCK_POSTDOCK   True
+DOCK_POSTDOCKSTRAIN     ${strain_correction}
+DOCK_EPIK_PENALTIES   True
+DOCK_HBOND_ACCEP_HALO    True
 INP2
+elif [ $Docking == "peptide" ];then
+echo "DOCK_PEPTIDE    ${Peptide_docking}
+DOCK_DOCKING_METHOD ${DOCKING_METHOD}
+DOCK_PRECISION      ${PRECISION}
+DOCK_LIG_VSCALE     ${scalingVdW}
+DOCK_POSES_PER_LIG      ${Pose_Num}
+DOCK_POSE_OUTTYPE       poseviewer
+GENERATE_TOP_COMPLEXES      ${OUT_com}
+DOCK_NENHANCED_SAMPLING     ${SAMPLING}
+DOCK_FORCEFIELD      ${Force_Field}
+DOCK_MAXKEEP    200000
+DOCK_MAXREF     2000
+DOCK_POSTDOCK_NPOSE     200
+DOCK_POSTDOCK   True
+DOCK_POSTDOCKSTRAIN     ${strain_correction}
+DOCK_EPIK_PENALTIES   True
+DOCK_HBOND_ACCEP_HALO    True
+" >> ${Job_Title}.inp
 elif [ $Docking == "false" ];then
     echo "SKIP_DOCKING      TRUE" >>  ${Job_Title}.inp
 else
@@ -577,13 +655,44 @@ fi
 
 echo "Submitting Flexible Docking Jobs......"
 echo ""
+check_inp ${Job_Title}.inp  
 if [ $HOST == "localhost" ]; then
-    ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST localhost -WAIT -TMPLAUNCHDIR -OVERWRITE  ${Job_Title}.inp  
+    ${SCHRODINGER}/run xglide.py -NJOBS ${Njobs} -HOST "localhost:${Njobs}" -WAIT -verbose -TMPLAUNCHDIR -OVERWRITE ${Job_Title}.inp  
 else
-    ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -TMPLAUNCHDIR -OVERWRITE  ${Job_Title}.inp  
+    ${SCHRODINGER}/run xglide.py -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -verbose -DRIVERHOST "${HOST}"  -TMPLAUNCHDIR -OVERWRITE ${Job_Title}.inp  
 fi
 
-fi && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!" # Xglide Module
+fi && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!" 
+# Xglide Module
+
+# Native Dock
+if [ "$Native"x == "true"x ];then
+
+cat<<INP0 >  ${Job_Title}.inp
+#Job Dic.: ${Job_Dir}
+#Protein Lib: ${Protein_to_DOCK}
+########################################
+# ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -verbose -DRIVERHOST "${HOST}" -TMPLAUNCHDIR -OVERWRITE ${Job_Title}.inp  
+########################################
+COMPLEX         ${Protein_to_DOCK}
+DOCK_PRECISION       ${PRECISION}
+GRIDGEN_GRID_CENTER  SELF
+NATIVEONLY           TRUE
+DOCK_POSES_PER_LIG      ${Pose_Num}
+DOCK_NENHANCED_SAMPLING ${SAMPLING}
+DOCK_POSE_OUTTYPE       poseviewer
+INP0
+
+echo "Submitting Native re-docking Jobs......"
+echo ""
+if [ $HOST == "localhost" ]; then
+    ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "localhost:${Njobs}" -verbose -WAIT -TMPLAUNCHDIR -OVERWRITE ${Job_Title}.inp
+else
+    ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -verbose -DRIVERHOST "${HOST}" -TMPLAUNCHDIR -OVERWRITE ${Job_Title}.inp  
+fi
+
+fi && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!" 
+# Native redock
 
 # Induce Fit Module
 if [ "$Induce_Fit"x == "true"x ];then
@@ -600,6 +709,10 @@ if [ "$Induce_Fit"x == "true"x ];then
         echo "Induce Fit Docking cannot to using SiteMap."
     fi 
 cat<<IFT1 >  ${Job_Title}.inp
+#Job Dic.: ${Job_Dir}
+########################################
+# ${SCHRODINGER}/ifd -NGLIDECPU ${Njobs} -NPRIMECPU ${Prime}  ${Job_Title}.inp -NOLOCAL -HOST ${HOST} -SUBHOST ${HOST} -TMPLAUNCHDIR
+########################################
 INPUT_FILE  Proteins_to_InduceFitDock.maegz
 IFT1
 
@@ -666,34 +779,13 @@ IFT2
 echo "Submitting Induce Fit Docking Jobs......"
 echo ""
 if [ $HOST == "localhost" ]; then
-    ${SCHRODINGER}/ifd -NGLIDECPU ${Njobs} -NPRIMECPU ${Prime}  ${Job_Title}.inp -HOST localhost -TMPLAUNCHDIR -WAIT
+    ${SCHRODINGER}/ifd -NGLIDECPU ${Njobs} -NPRIMECPU ${Prime} -HOST "localhost:${Njobs}" -TMPLAUNCHDIR -WAIT -OVERWRITE ${Job_Title}.inp 
 else
-    ${SCHRODINGER}/ifd -NGLIDECPU ${Njobs} -NPRIMECPU ${Prime}  ${Job_Title}.inp -NOLOCAL -HOST ${HOST} -SUBHOST ${HOST} -TMPLAUNCHDIR
+    ${SCHRODINGER}/ifd -NGLIDECPU ${Njobs} -NPRIMECPU ${Prime}  ${Job_Title}.inp -NOLOCAL -HOST ${HOST} -SUBHOST ${HOST} -TMPLAUNCHDIR -OVERWRITE ${Job_Title}.inp 
 fi
 
-fi && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!" # Induce Fit Module
+fi && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!" 
+# Induce Fit Module
 
-if [ "$Native"x == "true"x ];then
-
-cat<<INP0 >  ${Job_Title}.inp
-#Job Dic.: ${Job_Dir}
-#Protein Lib: ${Protein_to_DOCK}
-COMPLEX         ${Protein_to_DOCK}
-DOCK_PRECISION       ${PRECISION}
-GRIDGEN_GRID_CENTER  SELF
-NATIVEONLY           TRUE
-DOCK_POSES_PER_LIG      ${Pose_Num}
-DOCK_NENHANCED_SAMPLING ${SAMPLING}
-DOCK_POSE_OUTTYPE       poseviewer
-INP0
-
-echo "Submitting Native re-docking Jobs......"
-echo ""
-if [ $HOST == "localhost" ]; then
-    ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST localhost -WAIT -TMPLAUNCHDIR -OVERWRITE  ${Job_Title}.inp
-else
-    ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -TMPLAUNCHDIR -OVERWRITE  ${Job_Title}.inp  
-fi
-
-fi && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!" # Native redock
 cd ..
+exit
