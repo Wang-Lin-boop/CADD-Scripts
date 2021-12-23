@@ -355,16 +355,16 @@ System Builder parameter:
 		If you want use Orthorhombic or Triclinic box, your parameter should be like "15.0 15.0 15.0"
   -R    Redistribute the mass of heavy atoms to bonded hydrogen atoms to slow-down high frequency motions.
   -F	Define a force field to build your systems. <OPLS_2005>
-		OPLS_2005, S-OPLS, OPLS3e, OPLS3, OPLS2 are recommended to protein-ligand systems.
+		OPLS_2005, S-OPLS, OPLS3e, OPLS3, OPLS2 are recommended to receptor-ligand systems.
 
 Simulation control parameter:
   -m	Enter the maximum simulation time for the Brownian motion simulation, in ps. <${mintime}>
   -t    Enter the Molecular dynamics simulation time for the product simulation, in ns. <100>
   -T    Specify the temperature to be used, in kelvin. <${temperature}>
   -N    Number of Repeat simulation with different random numbers. <${num}>
-  -P    Define a ASL to protein, such as "protein".
+  -P    Define a ASL to receptor, such as "protein".
   -L    Define a ASL to ligand, such as "res.ptype UNK".
-  -q    Turn off protein-ligand analysis.
+  -q    Turn off receptor-ligand analysis.
   -u    Turn off md simulation, only system build.
   -C    Set constraint to an ASL, such as "chain.name A AND backbone"
   -f    Set constraint force, default is 10.
@@ -448,7 +448,7 @@ done
 # Check Desmond and hostfile
 if [ -d ${Desmond} ];then
   if [ "${Desmond}" == "" ];then
-    echo "The environment variable \${Desmond} not found. Please check the Desmond in your ~/.bashrc."
+    echo "The environment variable \${Desmond} not found. Please check the Desmond path in your ~/.bashrc."
     exit
   fi
   if [ "`grep -c $CPU_HOST ${Desmond}/schrodinger.hosts`" == "0" ];then
