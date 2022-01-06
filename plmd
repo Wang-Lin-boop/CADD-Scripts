@@ -1,6 +1,6 @@
 #!/bin/bash
 #########################################################################
-# plmd, Version 1.4.0
+# plmd, Version 1.4.5
 # 2021, ShanghaiTech University, Wang Lin
 # Email: wanglin3@shanghaitech.edu.cn
 #########################################################################
@@ -373,8 +373,8 @@ Simulation control parameter:
         If you adjust the number of frames, the recording interval will be modified.
 
 Job control:
-  -G	HOST of GPU queue, default is ${CPU_HOST}.
-  -H    HOST of CPU queue, default is ${GPU_HOST}.
+  -G	HOST of GPU queue, default is ${GPU_HOST}.
+  -H    HOST of CPU queue, default is ${CPU_HOST}.
   -D	Your Desmond path. <${Desmond}>
 
 Thank you for your using, If you found any question, Please contact wanglin3@shanghaitech.edu.cn.
