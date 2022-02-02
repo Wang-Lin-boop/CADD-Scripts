@@ -9,6 +9,7 @@
     #Input
     Protein_Input="Protein_lib"
     Ligand_Input="Ligand_Lib"
+    Grid_LIB=${Gird_10Site_Lib}
 
     Peptide_Segment=false
     Peptide_Length=12
@@ -72,17 +73,17 @@ Usage: XDock [OPTION] <parameter>
 
 Example: 
 1) Normal Reverse Docking and detecting pockets using SiteMap
-XDock -P <Targets Library> -p fine -L <Ligand File or Library> -m SITEMAP -s 5
+XDock -P <Targets Library> -p fine -L <Ligand File or Library> -m SITEMAP -s 5 -H <CPU>
 2) Only consider the protein-ligand complexes and Using the induce-fit docking.
-XDock -P <Targets Library> -p hopt -L <Ligand File or Library> -m COMPI
+XDock -P <Targets Library> -p hopt -L <Ligand File or Library> -m COMPI -H <CPU>
 3) Just to generate grids.
-XDock -P <Targets Library> -p hopt -L <Ligand File or Library> -s 3 -m SiteMapGrid
+XDock -P <Targets Library> -p hopt -L <Ligand File or Library> -s 3 -m SiteMapGrid -H <CPU>
 4) Docking based on pre-generated grids.
-XDock -P <Grids Library> -p none -L <Ligand File or Library> -s 3 -m Dock
+XDock -P <Grids Library> -p none -L <Ligand File or Library> -s 3 -m Dock -H <CPU>
 5) Reverse Docking with targets and some disorder protein structures
-XDock -P <Targets Library> -p hopt -L <disorder protein or peptide File or Library> -t -m SITEMAP -s 3
+XDock -P <Targets Library> -p hopt -L <disorder protein or peptide File or Library> -t -m SITEMAP -s 3 -H <CPU>
 6) Fast Induce Fit Reverse Docking
-a. XDock -P <Targets Library> -p fine -L <Ligand File or Library> -m SITEMAP -s 5 -v 0.4 
+a. XDock -P <Targets Library> -p fine -L <Ligand File or Library> -m SITEMAP -s 5 -v 0.4 -H <CPU>
 b. NOTE: The results will save into a "Xglide-MODE_topcomplexes.maegz" file, you can run MMGBSA to re-rank the results and relax complex structure.
     b1) Windows in Schrodinger Power Shell
     prime_mmgbsa.exe -job_type REAL_MIN  -rflexdist 4 -jobname XDOCK-MMGBSA -ligand "res.ptype UNK" -NJOBS 8 -HOST localhost *_topcomplexes.maegz
@@ -92,6 +93,8 @@ b. NOTE: The results will save into a "Xglide-MODE_topcomplexes.maegz" file, you
 Input parameter:
   -P	Path to Protein Library.
   -L    Ligand File or Library, in *.pdb, *.sdf, *.mae or *.maegz formats.
+  -u    UniprotID or Grid index list for targets.
+  -U    The library contains grids for the uniprot entry. The grid name must contain UniprotID or Grid index. <$Grid_LIB> 
   -d    Segment proteins in Ligand File or Library to Peptides, Ligand File must be pdb format. <12:5>
             -d "12:5" means: length for each peptides is 12 aa, and Segmentation stepwise is 5 aa.
             use "-0" to stop pipeline after peptide segmentation. The results will save into dir "Peptides_Lib".
@@ -168,7 +171,7 @@ check_inp(){
     fi
 }
 
-while getopts ":hP:L:l:p:H:N:S:g:s:m:a:n:o:x:A:F:D:r:R:B:ewv:tV:d:b:i:T:f:u0" opt
+while getopts ":hP:L:l:p:H:N:S:g:s:m:a:n:o:x:A:F:D:r:R:B:ewv:tV:d:b:i:T:f:10u:U:" opt
 do
   case $opt in
     h)
@@ -188,6 +191,10 @@ do
         rosetta_version=$OPTARG;;
     P)
         Protein_Input=`readlink -f $OPTARG`;;
+    U)
+        Grid_LIB=$OPTARG;;
+    u)
+        uniprot_list=$OPTARG;;
     L)
         Ligand_Input=`readlink -f $OPTARG`;;
     d)
@@ -244,7 +251,7 @@ do
         GRIDGEN_PEPTIDE=true;;
     T)
         Job_Title=$OPTARG;;
-    u)
+    1)
         strain_correction=FALSE;;
     ?)
         echo ""
@@ -285,6 +292,16 @@ fi
 }
 testarray $PRECISION "${VAILD_PRECISION[*]}"
 testarray $Force_Field "${VAILD_FF[*]}"
+
+if [ ${uniprot_list} ] && [ -f ${uniprot_list} ];then
+    uniprot_list_name=$(basename ${uniprot_list%%.*})
+    mkdir -p ${uniprot_list_name}-Grid
+    cat ${uniprot_list} | sort | uniq | parallel -j 8 cp ${Grid_LIB}/*{}* ${uniprot_list_name}-Grid/
+    Protein_Input=`readlink -f ${uniprot_list_name}-Grid`
+    associated_grid_num=`ls ${uniprot_list_name}-Grid | wc -l`
+    echo "${associated_grid_num} Grids associated with ${uniprot_list_name} were found."
+    ProPrep="none"
+fi
 
 cat<<OUTPUTLOG
 XDock Workflow Parameter:
@@ -660,7 +677,7 @@ if [ $HOST == "localhost" ]; then
     ${SCHRODINGER}/run xglide.py -NJOBS ${Njobs} -HOST "localhost:${Njobs}" -WAIT -verbose -TMPLAUNCHDIR -OVERWRITE ${Job_Title}.inp  
 else
     ${SCHRODINGER}/run xglide.py -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -verbose -DRIVERHOST "${HOST}"  -TMPLAUNCHDIR -OVERWRITE ${Job_Title}.inp  
-fi
+fi 
 
 fi && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!" 
 # Xglide Module

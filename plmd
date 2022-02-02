@@ -328,10 +328,10 @@ Usage: plmd [OPTION] <parameter>
 An automatic Desmond MD pipline for protein-ligand complex MD simulation.
 
 Example: 
-1) plmd -i "*.mae" -S INC -P "chain.name A" -L "res.ptype UNK" -H CPU_110 -G GPU_110
-2) plmd -i "*.mae" -S OUC -P "chain.name A" -L "chain.name B" -t 200 -H CPU_110 -G GPU_110
-3) plmd -i "*.mae" -S "TIP4P:Cl:0.15-Na-Cl+0.02-Fe2-Cl+0.02-Mg2-Cl" -L "res.num 999" -G GPU_110
-4) plmd -i "*.cms" -P "chain.name A" -L "res.ptype ADP" -H CPU_110 -G GPU_110
+1) plmd -i "*.mae" -S INC -P "chain.name A" -L "res.ptype UNK" -H CPU -G GPU
+2) plmd -i "*.mae" -S OUC -P "chain.name A" -L "chain.name B" -t 200 -H CPU -G GPU
+3) plmd -i "*.mae" -S "TIP4P:Cl:0.15-Na-Cl+0.02-Fe2-Cl+0.02-Mg2-Cl" -L "res.num 999" -G GPU
+4) plmd -i "*.cms" -P "chain.name A" -L "res.ptype ADP" -H CPU -G GPU
 
 Input parameter:
   -i	Use a file name (Multiple files are wrapped in "", and split by ' ') *.mae or *.cms ;

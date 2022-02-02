@@ -1285,6 +1285,9 @@ cat<<HTVS >> ${Inp_Name}
     OUTPUTS   HTVS_OUT,
     RECOMBINE   NO
     PRECISION   HTVS
+    MAXKEEP 20000
+    MAXREF 1000
+    SCORING_CUTOFF 500
     UNIQUEFIELD   s_vsw_compound_code
     ${KEEP_NUM}
     FORCEFIELD  ${corse_ff}
@@ -1805,6 +1808,9 @@ cat<<SP >> ${Inp_Name}
     OUTPUTS   ${task}_SP_OUT,
     RECOMBINE   NO
     PRECISION   SP
+    MAXKEEP 50000
+    MAXREF 1000
+    SCORING_CUTOFF 500
     REWARD_INTRA_HBONDS YES
     HBOND_ACCEP_HALO    YES
     UNIQUEFIELD   s_vsw_compound_code
@@ -2160,8 +2166,9 @@ cat<<XP >> ${Inp_Name}
     PRECISION   XP
     REWARD_INTRA_HBONDS YES
     HBOND_ACCEP_HALO    YES
-    MAXKEEP 10000
-    MAXREF 800
+    MAXKEEP 50000
+    MAXREF 1000
+    SCORING_CUTOFF 500
     UNIQUEFIELD   s_vsw_compound_code
     ${KEEP_NUM}
     FORCEFIELD  ${Force_Field}
