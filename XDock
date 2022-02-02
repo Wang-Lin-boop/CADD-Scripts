@@ -86,9 +86,9 @@ XDock -P <Targets Library> -p hopt -L <disorder protein or peptide File or Libra
 a. XDock -P <Targets Library> -p fine -L <Ligand File or Library> -m SITEMAP -s 5 -v 0.4 -H <CPU>
 b. NOTE: The results will save into a "Xglide-MODE_topcomplexes.maegz" file, you can run MMGBSA to re-rank the results and relax complex structure.
     b1) Windows in Schrodinger Power Shell
-    prime_mmgbsa.exe -job_type REAL_MIN  -rflexdist 4 -jobname XDOCK-MMGBSA -ligand "res.ptype UNK" -NJOBS 8 -HOST localhost *_topcomplexes.maegz
+    prime_mmgbsa.exe -out_type COMPLEX -flexdist 5.0 -job_type PGL -job_type REAL_MIN -jobname XDOCK-MMGBSA -ligand "res.ptype UNK" -NJOBS 8 -HOST localhost *_topcomplexes.maegz
     b2) Linux
-    prime_mmgbsa -job_type REAL_MIN  -rflexdist 4 -jobname XDOCK-MMGBSA -ligand "res.ptype UNK" -NJOBS 40 -HOST HPC_CPU *_topcomplexes.maegz
+    prime_mmgbsa -out_type COMPLEX -flexdist 5.0 -job_type PGL -job_type REAL_MIN -jobname XDOCK-MMGBSA -ligand "res.ptype UNK" -NJOBS 40 -HOST HPC_CPU *_topcomplexes.maegz
 
 Input parameter:
   -P	Path to Protein Library.
