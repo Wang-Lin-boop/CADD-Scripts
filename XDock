@@ -92,21 +92,22 @@ b. NOTE: The results will save into a "Xglide-MODE_topcomplexes.maegz" file, you
 
 Input parameter:
   -P	Path to Protein Library.
-  -L    Ligand File or Library, in *.pdb, *.sdf, *.mae or *.maegz formats.
-  -u    UniprotID or Grid index list for targets.
+  -L    Ligand file or Library, in *.pdb, *.sdf, *.mae or *.maegz formats.
+  -u    UniprotID or grid index list for targets.
   -U    The library contains grids for the uniprot entry. The grid name must contain UniprotID or Grid index. <$Grid_LIB> 
   -d    Segment proteins in Ligand File or Library to Peptides, Ligand File must be pdb format. <12:5>
             -d "12:5" means: length for each peptides is 12 aa, and Segmentation stepwise is 5 aa.
             use "-0" to stop pipeline after peptide segmentation. The results will save into dir "Peptides_Lib".
-  -f    Peptide Fasta file. use "-c" to cap peptides.
+  -f    Peptide fasta file. use "-c" to cap peptides.
 
 XDock control parameter:
-  -l    Ligands prepared mode, default is false, use "-l true" to open the ligand preparation process. <epik>
+  -l    Ligands prepared mode, default is none, use "-l epik" to open the ligand preparation process. <epik>
             The ligands will be processed using Schrödinger's LigPrep module.
             none: do not prepare ligands.
             epik: Generate het group states with Epik.
             ionizer: Generate het group states with Ionizer.
-  -p    Protein need to be prepared, default is true, use "-p false" to close it. <rough>
+  -p    Protein need to be prepared, default is rough, use "-p none" to close it. <rough>
+        NOTE: It is recommended to prepare your protein library by yourself before executing XDock.
             none: do not prepare proteins.
             rosetta: prepare proteins using rosetta score_jd2.
             rough: add hydrogens + Ionizer. 
@@ -125,8 +126,8 @@ XDock control parameter:
             ComplexGrid: Grid Generation by Ligand position of Complex Structure, associated with -a.
             CenterGrid: Grid Generation by center Coordinate.
             Dock: Docking by input girds in Protein Library.
-            COMPI: Ligand position of protein-ligand complex, Induce Fit Docking.
-            GCI: User Defined Grid center, Induce Fit Docking.
+            COMPI: Ligand position of protein-ligand complex, Induce Fit Docking. Not Recommended!
+            GCI: User Defined Grid center, Induce Fit Docking. Not Recommended!
                 Define pocket by Provided Grid center Coordinate, e.g. -g "153.00, 65.023, 24.003".
   -a    Ligand ASL for COMPD or ComplexGrid Mode, default is the first ligand detected. <$ligand_asl>
 
@@ -135,17 +136,17 @@ XDock control parameter:
             Define a grid center Coordinate to docking, additionally. Such as "153.00, 65.023, 24.003".
   -s    The number of Grid files per protein generated using Sitemap. <2>
   -n    Number of pose per ligand. <1>
-  -o    Number of Top Complexes to Output for per protein. <1>
+  -o    Number of top Complexes to Output for per protein. <1>
             NOTE: It is recommended that "-o = -n * number of ligands". 
   -x    The PRECISION of Docking, SP, XP and HTVS are supported. Default is SP.
-  -A    Reference Ligand ASL to induce Fit Docking. Such as: "A:999"
+  -A    Reference ligand ASL to induce Fit Docking. Such as: "A:999"
   -D    residues within the specified distance will be set to flexible in Induce Fit Docking. default is 5.0 Å.
   -F    Force Field in Docking, OPLS_2005, OPLS3e or OPLS4.
   -e    Enchanced Sampling.
   -w    Refining ligand conformation in-place at docking stage.
   -t    Peptide docking, if your ligands is peptides, please use -t. Default is turn off.
-  -i    Inner Box size. The space for ligand centroid motion. <12>
-  -b    Box Outer buffer, reducing this value increases sampling efficiency but may fall into local minimization. <5>
+  -i    Inner box size. The space for ligand centroid motion. <12>
+  -b    Box outer buffer, reducing this value increases sampling efficiency but may fall into local minimization. <5>
         The grid size will be the sum of the inner box size (default 12), the computed max ligand size, and the box outer buffer.
 
 Job control:
@@ -158,7 +159,7 @@ Job control:
   -B    Your Rosetta Database. <$rosetta_db>
   -V    Rosetta version, static or mpi. <mpi>
 
-Thank you for your using, If you found any problem, Please contact wanglin3@shanghaitech.edu.cn.
+Thank you for your using, If you found any problem, please contact wanglin3@shanghaitech.edu.cn.
 HELP
 }
 
