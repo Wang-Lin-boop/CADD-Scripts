@@ -9,7 +9,7 @@
     #Input
     Protein_Input="Protein_lib"
     Ligand_Input="Ligand_Lib"
-    Grid_LIB=${Gird_10Site_Lib}
+    Grid_LIB=${Gird_Lib}
 
     Peptide_Segment=false
     Peptide_Length=12
