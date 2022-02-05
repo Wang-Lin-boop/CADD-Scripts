@@ -534,7 +534,7 @@ Your MD information is as follows:
 
 MIN time: ${mintime} ps
 MD time: ${mdtime} ps
-temperature: ${Temperature} K
+temperature: ${temperature} K
 Repeat: ${num}
 Rondom numbers list: ${seedlist[@]}
 
