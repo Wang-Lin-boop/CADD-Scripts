@@ -133,9 +133,9 @@ EOF
 function sys_build(){
     # genenate parts to system build for msj 
     SYS_array=(${SYS_pipeline//:/ })
-    solvent=${SYS_array[0]}
-    neutralizeion=${SYS_array[1]}
-    salt_buffer_info=${SYS_array[2]}
+    export solvent=${SYS_array[0]}
+    export neutralizeion=${SYS_array[1]}
+    export salt_buffer_info=${SYS_array[2]}
     [ ${first_input} == "no" ] || checkparam ${neutralizeion} "${all_ions_list[*]}"
     [ ${first_input} == "no" ] || checkparam ${solvent} "${solventlist[*]}"
     echo "build_geometry {" >> plmd.msj
@@ -147,9 +147,9 @@ function sys_build(){
     salt_buffer_list=(${salt_buffer_info//+/ })
     for salt_buffer in ${salt_buffer_list[@]} ;do
         salt_buffer_array=(${salt_buffer//-/ })
-        saltconcentration=${salt_buffer_array[0]}
-        positive_ion=${salt_buffer_array[1]}
-        negative_ion=${salt_buffer_array[2]}
+        export saltconcentration=${salt_buffer_array[0]}
+        export positive_ion=${salt_buffer_array[1]}
+        export negative_ion=${salt_buffer_array[2]}
         [ ${first_input} == "no" ] || checkparam ${positive_ion} "${positiveionlist[*]}"
         [ ${first_input} == "no" ] || checkparam ${negative_ion} "${nagativeionlist[*]}"
         setup_salt ${saltconcentration} ${positive_ion} ${negative_ion} >> plmd.msj
@@ -388,55 +388,55 @@ do
         help
         exit;;
     i)
-        input=$OPTARG;;
+        export input=$OPTARG;;
     S)
-        System_Mode=$OPTARG;;
+        export System_Mode=$OPTARG;;
     s)
-        boxsize=$OPTARG
-        boxxyz=${boxsize}
+        export boxsize=$OPTARG
+        export boxxyz=${boxsize}
         ;;
     b)
-        boxshape=$OPTARG;;
+        export boxshape=$OPTARG;;
     m)
-        mintime=$OPTARG;;
+        export mintime=$OPTARG;;
     R)
-        hydrogen_mass_repartition=true;;
+        export hydrogen_mass_repartition=true;;
     H)
-        CPU_HOST=$OPTARG;;
+        export CPU_HOST=$OPTARG;;
     G)
-        GPU_HOST=$OPTARG;;
+        export GPU_HOST=$OPTARG;;
     D)
-        Desmond=$OPTARG;;
+        export Desmond=$OPTARG;;
     c)
-        saltconcentration=$OPTARG;;
+        export saltconcentration=$OPTARG;;
     f)
-        constraint=true
-        constraintForce=$OPTARG
+        export constraint=true
+        export constraintForce=$OPTARG
         ;;
     C)
-        constraint=true
-        constraintASL=$OPTARG
+        export constraint=true
+        export constraintASL=$OPTARG
         ;;
     t)
-        mdtime=`echo "${OPTARG} * 1000.0"|bc`;;
+        export mdtime=`echo "${OPTARG} * 1000.0"|bc`;;
     N)
-        num=$OPTARG;;
+        export num=$OPTARG;;
     q)
-        Analysis=false;;
+        export Analysis=false;;
     P)
-        ProteinASL=$OPTARG
+        export ProteinASL=$OPTARG
         ;;
     L)
-        LigandASL=$OPTARG
+        export LigandASL=$OPTARG
         ;;
     T)
-        temperature=$OPTARG;;
+        export temperature=$OPTARG;;
     o)
-        frames=$OPTARG;;
+        export frames=$OPTARG;;
     F)
-        ffid=$OPTARG;;
+        export ffid=$OPTARG;;
     u)
-        trunoff_md=true;;
+        export trunoff_md=true;;
     ?)
       echo ""
       echo "Error: Do not use undefined options. Try -h."
@@ -466,11 +466,11 @@ fi
 
 # box type and size
 if [ "${boxshape}"x == "orthorhombic"x ];then
-  boxsize="[${boxxyz} ]"
+  export boxsize="[${boxxyz} ]"
 elif [ "${boxshape}"x == "triclinic"x ];then
-  boxsize="[${boxxyz} 60.0 60.0 60.0 ]"
+  export boxsize="[${boxxyz} 60.0 60.0 60.0 ]"
 else
-  boxsize=${boxsize}
+  export boxsize=${boxsize}
 fi
 
 # MD basic control
@@ -495,33 +495,33 @@ else
 fi
 
 #check params
-fflist=("OPLS_2005" "OPLS3e" "OPLS4" "OPLS3" "OPLS2" "amber99SB-ILDN" "amber03" "amber99" "amber99SB" "charmm32" "charmm36_lipids" "S-OPLS")
-nagativeionlist=("F" "Cl" "Br" "I")
-positiveionlist=("Na" "K" "Li" "Rb" "Cs" "Mg2" "Ca2" "Zn2" "Fe2" "Fe3")
-all_ions_list=("F" "Cl" "Br" "I" "Na" "K" "Li" "Rb" "Cs" "Mg2" "Ca2" "Zn2" "Fe2" "Fe3")
-solventlist=("SPC" "TIP3P" "TIP4P" "TIP5P" "DMSO" "METHANOL")
-boxlist=("orthorhombic" "triclinic" "dodecahedron_hexagon" "cubic")
-waterlist=("SPC" "TIP3P" "TIP4P" "TIP5P")
-first_input="yes"
+export fflist=("OPLS_2005" "OPLS3e" "OPLS4" "OPLS3" "OPLS2" "amber99SB-ILDN" "amber03" "amber99" "amber99SB" "charmm32" "charmm36_lipids" "S-OPLS")
+export nagativeionlist=("F" "Cl" "Br" "I")
+export positiveionlist=("Na" "K" "Li" "Rb" "Cs" "Mg2" "Ca2" "Zn2" "Fe2" "Fe3")
+export all_ions_list=("F" "Cl" "Br" "I" "Na" "K" "Li" "Rb" "Cs" "Mg2" "Ca2" "Zn2" "Fe2" "Fe3")
+export solventlist=("SPC" "TIP3P" "TIP4P" "TIP5P" "DMSO" "METHANOL")
+export boxlist=("orthorhombic" "triclinic" "dodecahedron_hexagon" "cubic")
+export waterlist=("SPC" "TIP3P" "TIP4P" "TIP5P")
+export first_input="yes"
 [ ${first_input} == "no" ] || checkparam $ffid "${fflist[*]}"
 [ ${first_input} == "no" ] || checkparam $boxshape "${boxlist[*]}"
 
 # Parse params
 if [ "$constraint"x == "true"x ];then
-    constraintDescription="restrain = {atom = \"asl:${constraintASL}\" force_constant = ${constraintForce}}"
+    export constraintDescription="restrain = {atom = \"asl:${constraintASL}\" force_constant = ${constraintForce}}"
 else
-    constraintDescription="restrain = none"
+    export constraintDescription="restrain = none"
 fi
 
 if [ ${ffid:0:4} == "OPLS" ] || [ ${ffid} == "S-OPLS" ]; then
-    override_forcefield=${ffid}
+    export override_forcefield=${ffid}
 else
-    override_forcefield="OPLS_2005"
+    export override_forcefield="OPLS_2005"
 fi
 
 for line in ${waterlist[@]}; do
 if [ "$solvent" == "$line" ];then
-  water="water = ${solvent}"
+  export water="water = ${solvent}"
   break
 fi; done
 
@@ -577,11 +577,11 @@ MSJ1
         elif [ ${i##*.} == mae ];then
             echo "Put the ${i} to MD simulation."
             if [ $System_Mode == "INC" ];then
-                SYS_pipeline="TIP3P:K:0.15-K-Cl"
+                export SYS_pipeline="TIP3P:K:0.15-K-Cl"
             elif [ $System_Mode == "OUC" ];then
-                SYS_pipeline="TIP3P:Na:0.15-Na-Cl"
+                export SYS_pipeline="TIP3P:Na:0.15-Na-Cl"
             else
-                SYS_pipeline=$System_Mode
+                export SYS_pipeline=$System_Mode
             fi
             sys_build
         else
