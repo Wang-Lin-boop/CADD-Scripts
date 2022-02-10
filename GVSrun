@@ -1,6 +1,6 @@
 #!/bin/bash
 #########################################################################
-# GVSrun, Version 1.4.5
+# GVSrun, Version 1.4.8
 # 2021, ShanghaiTech University, Wang Lin
 # Email: wanglin3@shanghaitech.edu.cn
 #########################################################################
@@ -440,22 +440,26 @@ GRID
 }
 
 setdatabase(){
-cat<<SETDB >> ${Inp_Name}
+    if [ "${Database_Location: -5}"x == ".phdb"x ];then
+        cat<<SETDB >> ${Inp_Name}
+[SET:INPUT_PhaseDB]
+    VARCLASS    PhaseDB
+    PATH    ${Database_Location}
+[STAGE:DBexport]
+    STAGECLASS  phase.DBExportStage
+    INPUTS  INPUT_PhaseDB,
+    OUTPUTS INPUT_Ligands,
+SETDB
+    elif [ ${Database_Location##*.} == "mae" ] || [ ${Database_Location##*.} == "maegz" ] || [ ${Database_Location##*.} == "sdf" ] || [ ${Database_Location##*.} == "smi" ];then
+        cat<<SETDB >> ${Inp_Name}
+[SET:INPUT_Ligands]
+    VARCLASS    Structures
+    FILES   ${Database_Location}, 
+SETDB
+    elif [ -d ${Database_Location} ]; then
+        cat<<SETDB >> ${Inp_Name}
 [SET:INPUT_Ligands]
 SETDB
-    if [ "${Database_Location:-5}"x == ".phdb"x ];then
-        echo "  VARCLASS    PhaseDB" >> ${Inp_Name}
-        echo "  PATH    ${Database_Path}" >> ${Inp_Name}
-        echo "  FILE   ${Database}" >> ${Inp_Name}
-    elif [ ${Database_Location##*.} == "mae" ] || [ ${Database_Location##*.} == "maegz" ] || [ ${Database_Location##*.} == "sdf" ] || [ ${Database_Location##*.} == "smi" ];then
-        echo "  VARCLASS    Structures" >> ${Inp_Name}
-        echo "  FILES   ${Database_Location}, " >> ${Inp_Name}
-    elif [ -f ${Database_Location}/*.phdb ];then
-        phdb_name=`ls ${Database_Location}/*.phdb | awk '{ORS=","}''{print}'`
-        echo "  VARCLASS    PhaseDB" >> ${Inp_Name}
-        echo "  PATH    ${Database_Location}" >> ${Inp_Name}
-        echo "  FILES   ${phdb_name}" >> ${Inp_Name}
-    elif [ -d ${Database_Location} ]; then
         echo "  VARCLASS    Structures" >> ${Inp_Name}
         echo -n "   FILES   " >> ${Inp_Name}
         for file in `ls ${Database_Location}`;do
