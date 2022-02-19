@@ -9,7 +9,7 @@
     #Input
     Protein_Input="Protein_lib"
     Ligand_Input="Ligand_Lib"
-    Grid_LIB=${Gird_Lib}
+    Grid_LIB=${Gird_10Site_Lib}
 
     Peptide_Segment=false
     Peptide_Length=12
@@ -120,6 +120,7 @@ XDock control parameter:
                 Change the number of Grid files per protein generated using Sitemap by "-s <num>", default is 2.
             Native: re-dock the ligand in input complex.
             COMPD: proket defined by protein-ligand complex, associated with -a.
+            AllSite: combine SiteMap and all exist ligand to identify ligand binding sites.
             GCD: User Defined Grid center, SP Docking.
                 Define pocket by Provided Grid center Coordinate, e.g. "-g 153.00, 65.023, 24.003".
             SiteMapGrid: Grid Generation by SiteMap.
@@ -430,6 +431,13 @@ elif [ $ProPrep == "rosetta" ];then
     ls $Protein_Input | parallel -j $Njobs $rosetta_app/score_jd2.${rosetta_version}.linuxgccrelease -database $rosetta_db -in:file:s ${Protein_Input}/{} -out:file:scorefile ${Protein_Input}_jd2.sc -out:path:pdb $(basename $(readlink -f ${Protein_Input}))-OUT -score:weights ref2015 -out:pdb -ex1 -ex2aro -ignore_zero_occupancy false -in:ignore_unrecognized_res false
     Protein_to_DOCK=`readlink -f $(basename $(readlink -f ${Protein_Input}))-OUT`
     PPREP="FALSE"
+    PPREP_REHTREAT="FALSE"
+    PPREP_EPIK="FALSE"
+    PPREP_PROTASSIGN="FALSE"
+    PPREP_PROTASSIGN_EXHAUSTIVE="FALSE"
+    PPREP_IMPREF="FALSE"
+    PPREP_IMPREF_RMSD=0.30
+    PPREP_WATERDIST=3.0
 elif [ $ProPrep == "rough" ];then
     Protein_to_DOCK=${Protein_Input}
     PPREP="TRUE"
@@ -476,10 +484,11 @@ else
 fi
 
 # Job control "Normal" "Grid" "COMPD" "COMPI" "SITEMAP" "GCD" "GCI"
-if [ $Mode == "Normal" ];then
+if [ $Mode == "AllSite" ];then
     By_Center=false
     By_Complex=true
     By_SiteMap=true
+    ligand_asl="ligand"
     Xglide=true
     Docking=true
     Induce_Fit=false
