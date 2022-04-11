@@ -1,5 +1,6 @@
 # Schrodinger-Script
 Scripts to run Schrödinger jobs.
+[![DOI](https://zenodo.org/badge/365661221.svg)](https://zenodo.org/badge/latestdoi/365661221)
 
 Scripts
 ----
