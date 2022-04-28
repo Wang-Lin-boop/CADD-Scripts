@@ -5,7 +5,7 @@
 # Email: wanglin3@shanghaitech.edu.cn
 #########################################################################
 
-function checkparam (){
+function checkparam(){
 testlogic=false
 for line in $2
 do
@@ -156,6 +156,10 @@ function sys_build(){
     done
     echo "  solvent = ${solvent}" >> plmd.msj
     echo "}" >> plmd.msj
+}
+
+function set_md(){
+# Generate MSJ file
 cat<<MSJ2 >> plmd.msj
 assign_forcefield {
   forcefield = ${ffid}
@@ -165,10 +169,6 @@ assign_forcefield {
   compress = ""
 }
 MSJ2
-}
-
-function set_md(){
-# Generate MSJ file
 cat <<MD1 >> plmd.msj
 simulate {
     title       = "Brownian Dynamics NVT, T = 10 K, small timesteps, and restraints on solute_heavy_atom, 100 ps"
