@@ -552,6 +552,7 @@ echo ""
 
 for i in `ls $input`; do
     first_input="no"
+    input_file_path=`readlink -f $i`
     for seed in ${seedlist[@]};do
         if [ -d ${i%%.*}-${seed}-md ];then
             rm -r ${i%%.*}-${seed}-md
@@ -592,7 +593,7 @@ MSJ1
         else
             set_md
         fi
-        $Desmond/utilities/multisim -JOBNAME ${i%%.*}-${seed}-md -HOST "${CPU_HOST}:3" -SUBHOST ${GPU_HOST} -maxjob 0 -m plmd.msj -c plmd.cfg -lic DESMOND_ACADEMIC:16 -o ../${i%%.*}-${seed}-md-out.cms ../$i
+        $Desmond/utilities/multisim -JOBNAME ${i%%.*}-${seed}-md -HOST "${CPU_HOST}:3" -SUBHOST ${GPU_HOST} -maxjob 0 -m plmd.msj -c plmd.cfg -lic DESMOND_ACADEMIC:16 -o ../${i%%.*}-${seed}-md-out.cms ${input_file_path}
         cd ..
         date
         echo "MD system ${i%%.*} with seed ${seed} had been submitted to $GPU_HOST."
