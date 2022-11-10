@@ -1,6 +1,6 @@
 #!/bin/bash
 #########################################################################
-# plmd, Version 1.4.5
+# plmd, Version 1.5.1
 # 2021, ShanghaiTech University, Wang Lin
 # Email: wanglin3@shanghaitech.edu.cn
 #########################################################################
@@ -287,7 +287,7 @@ fi
     # MD system build
     export System_Mode="INC"
     export negaion='Cl'
-    export solvent="TIP3P"
+    export solvent="SPC"
     export rezerosys=true
     export minisys=true
     export boxshape=cubic
@@ -339,8 +339,8 @@ Input parameter:
 
 System Builder parameter:
   -S    System Build Mode: <INC>
-            INC: System in cell, salt buffer is 0.15M KCl, water is TIP3P. Add K to neutralize system.
-            OUC: System out of cell, salt buffer is 0.15M NaCl, water is TIP3P. Add Na to neutralize system.
+            INC: System in cell, salt buffer is 0.15M KCl, water is SPC. Add K to neutralize system.
+            OUC: System out of cell, salt buffer is 0.15M NaCl, water is SPC. Add Na to neutralize system.
             Custom Instruct: Such as: "TIP4P:Cl:0.15-Na-Cl+0.02-Fe2-Cl+0.02-Mg2-Cl"
                 Interactive addition of salt. Add Cl to neutralize system.
                     for positive_ion: Na, Li, K, Rb, Cs, Fe2, Fe3, Mg2, Ca2, Zn2 are predefined.
@@ -578,9 +578,9 @@ MSJ1
         elif [ ${i##*.} == mae ];then
             echo "Put the ${i} to MD simulation."
             if [ $System_Mode == "INC" ];then
-                export SYS_pipeline="TIP3P:K:0.15-K-Cl"
+                export SYS_pipeline="SPC:K:0.15-K-Cl"
             elif [ $System_Mode == "OUC" ];then
-                export SYS_pipeline="TIP3P:Na:0.15-Na-Cl"
+                export SYS_pipeline="SPC:Na:0.15-Na-Cl"
             else
                 export SYS_pipeline=$System_Mode
             fi
@@ -593,7 +593,27 @@ MSJ1
         else
             set_md
         fi
-        $Desmond/utilities/multisim -JOBNAME ${i%%.*}-${seed}-md -HOST "${CPU_HOST}:3" -SUBHOST ${GPU_HOST} -maxjob 0 -m plmd.msj -c plmd.cfg -lic DESMOND_ACADEMIC:16 -o ../${i%%.*}-${seed}-md-out.cms ${input_file_path}
+        if [ ${GPU_HOST} == "localhost" ];then
+            $Desmond/utilities/multisim -JOBNAME ${i%%.*}-${seed}-md -HOST "${CPU_HOST}:3" -SUBHOST ${GPU_HOST} -maxjob 0 -m plmd.msj -c plmd.cfg -WAIT -lic DESMOND_ACADEMIC:16 -o ../${i%%.*}-${seed}-md-out.cms ${input_file_path}
+        else
+            $Desmond/utilities/multisim -JOBNAME ${i%%.*}-${seed}-md -HOST "${CPU_HOST}:3" -SUBHOST ${GPU_HOST} -maxjob 0 -m plmd.msj -c plmd.cfg -lic DESMOND_ACADEMIC:16 -o ../${i%%.*}-${seed}-md-out.cms ${input_file_path}
+        fi
+extend_to_time=`echo "${mdtime} * 2.0"|bc`
+cat<<EXTEND > extend.sh
+${Desmond}/desmond -JOBNAME "${i%%.*}-${seed}-md" -HOST "${CPU_HOST}:3" -SUBHOST ${GPU_HOST} -restore ${i%%.*}-${seed}-md.cpt -in ${i%%.*}-${seed}-md-in.cms -cfg mdsim.last_time=${extend_to_time}
+EXTEND
+cat<<RESUME > resume.sh
+${Desmond}/desmond -JOBNAME "${i%%.*}-${seed}-md" -HOST "${CPU_HOST}:3" -SUBHOST ${GPU_HOST} -restore ${i%%.*}-${seed}-md.cpt -in ${i%%.*}-${seed}-md-in.cms
+RESUME
+cat<<CLUSTER > cluster.sh
+${Desmond}/run trj_cluster.py ${i%%.*}-${seed}-md-out.cms ${i%%.*}-${seed}-md_trj ${i%%.*}-${seed}_cluster -rmsd-asl "$1" -fit-asl "\$2" -n "\$3" -HOST ${CPU_HOST} -JOBNAME ${i%%.*}-${seed}_cluster
+CLUSTER
+cat<<ANALY > occupancy.sh
+${Desmond}/run trj_occupancy.py ${i%%.*}-${seed}-md-out.cms ${i%%.*}-${seed}-md_trj ${i%%.*}-${seed}_occupancy -fit-asl "\${2}" -map-asl "\${1}" -grid-length 50 -JOBNAME ${i%%.*}-${seed}_occupancy
+ANALY
+cat<<ANALY > ppi.sh
+${Desmond}/run analyze_trajectory_ppi.py ${i%%.*}-${seed}-md-out.cms ${i%%.*}-${seed}_ppi "\${1}" "\${2}"
+ANALY
         cd ..
         date
         echo "MD system ${i%%.*} with seed ${seed} had been submitted to $GPU_HOST."
@@ -602,7 +622,16 @@ done
 
 cat<<FF
 
-All jobs are running!
+All jobs are running! 
+
+NOTE: You can view the *-md.eaf in the job directorys to analysis the trajectories.
+NOTE: When the jobs finished, you can run the bash scripts in the job directorys to ....
+    Resume previous MD: bash resume.sh 
+    Extend MD: bash extend.sh # The Default time to extend is 2-fold of initial time.
+    Cluster trajectory: bash cluster.sh  "<rmsd selection>"  "<fit selection>"  "<number>"
+    Analysis Occupancy: bash occupancy.sh  "<selection to analysis>"  "<fit selection>"
+    Analysis ppi contact: bash ppi.sh  "<Component A>"  "<Component B>" 
+
 Thank you for your using, If you found any question, Please contact wanglin3@shanghaitech.edu.cn.
 
 FF
