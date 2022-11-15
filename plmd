@@ -20,6 +20,19 @@ else
 fi
 }
 
+function set_msj(){
+cat<<MSJ1 > plmd.msj
+task {
+  task = "desmond:auto"
+  set_family = {
+    simulate = {
+    checkpt.write_last_step = no
+    }
+  }
+}
+MSJ1
+}
+
 function gen_cfg(){
 interval=`echo "scale=1;${mdtime} / ${frames}"|bc`
 cat<<MDCFG > plmd.cfg
@@ -95,7 +108,7 @@ trajectory = {
 MDCFG
 }
 
-add_counterion(){
+function add_counterion(){
     neutralizeion=$1
 cat<<EOF
   add_counterion = {
@@ -105,7 +118,7 @@ cat<<EOF
 EOF
 };export -f add_counterion
 
-box(){
+function box(){
     boxshape=$1
     boxsize=$2
 cat<<EOF
@@ -117,7 +130,7 @@ cat<<EOF
 EOF
 };export -f box
 
-setup_salt(){
+function add_salt(){
     saltconcentration=$1
     positive_ion=$2
     negative_ion=$3
@@ -128,9 +141,9 @@ cat<<EOF
      positive_ion = ${positive_ion}
   }
 EOF
-};export -f setup_salt
+};export -f add_salt
 
-function sys_build(){
+function set_sys_build_msj(){
     # genenate parts to system build for msj 
     SYS_array=(${SYS_pipeline//:/ })
     export solvent=${SYS_array[0]}
@@ -152,14 +165,13 @@ function sys_build(){
         export negative_ion=${salt_buffer_array[2]}
         [ ${first_input} == "no" ] || checkparam ${positive_ion} "${positiveionlist[*]}"
         [ ${first_input} == "no" ] || checkparam ${negative_ion} "${nagativeionlist[*]}"
-        setup_salt ${saltconcentration} ${positive_ion} ${negative_ion} >> plmd.msj
+        add_salt ${saltconcentration} ${positive_ion} ${negative_ion} >> plmd.msj
     done
     echo "  solvent = ${solvent}" >> plmd.msj
     echo "}" >> plmd.msj
 }
 
-function set_md(){
-# Generate MSJ file
+function assign_opls(){
 cat<<MSJ2 >> plmd.msj
 assign_forcefield {
   forcefield = ${ffid}
@@ -169,7 +181,31 @@ assign_forcefield {
   compress = ""
 }
 MSJ2
-cat <<MD1 >> plmd.msj
+}
+
+function assign_viparr(){
+    input_to_viparr=$1
+    viparr_output=$2
+    VMD_ASL=`echo ${LigandASL} | sed 's/chain.name/chain/g' | sed 's/res.ptype/resname/g' | sed 's/,/ /g' | sed 's/res.num/resid/g' | sed 's/AND/and/g' | sed 's/NOT/not/g' | sed 's/OR/or/g'`
+    water_type=`echo ${solvent} | tr [A-Z] [a-z]`
+    if [ ${water_type} == "spce" ] || [ ${water_type} == "tip3p" ] || [ ${water_type} == "tip4pew" ];then
+        monovalent_ff="ions.amber1jc.${water_type}"
+    else
+        monovalent_ff="ions.amber1lm_iod.all"
+    fi
+    if [ ${ffid} == "Amber" ];then
+        viparr ${input_to_viparr} ${viparr_output} -f aa.amber.ff19SB -f aa.amber.phosaa10 -f aa.amber.ffncaa -f aa.amber.ffptm -f ${monovalent_ff} -f lipid.amber.lipid17 -f ions.amber2ff99.tip3p -f na.amber.bsc1 -f na.amber.tan2018 -f water.${water_type} --ligand-selection "${VMD_ASL}"
+    elif [ ${ffid} == "DES-Amber" ];then
+        viparr ${input_to_viparr} ${viparr_output} -f aa.DES-Amber -f aa.amber.phosaa10 -f aa.amber.ffncaa -f aa.amber.ffptm -f ${monovalent_ff} -f lipid.amber.lipid17 -f ions.amber2ff99.tip3p -f na.amber.bsc1 -f na.amber.tan2018 -f water.${water_type} --ligand-selection "${VMD_ASL}"
+    elif [ ${ffid} == "Charmm" ];then
+        [ ${water_type} == "tip3p" ] && water_type="tip3p_charmm"
+        viparr ${input_to_viparr} ${viparr_output} -f aa.charmm.c36m -f carb.charmm.c36 -f ethers.charmm.c35 -f ions.charmm36 -f lipid.charmm.c36 -f water.${water_type} -f na.charmm.c36 --ligand-selection "${VMD_ASL}"
+    fi
+}
+
+function set_md(){
+# Generate MSJ file
+cat<<MD1 >> plmd.msj
 simulate {
     title       = "Brownian Dynamics NVT, T = 10 K, small timesteps, and restraints on solute_heavy_atom, 100 ps"
     annealing   = off
@@ -285,6 +321,7 @@ fi
 
 #Default
     # MD system build
+    export SYS_BUILD="yes"
     export System_Mode="INC"
     export negaion='Cl'
     export solvent="SPC"
@@ -319,8 +356,31 @@ fi
 
     # Desmond
     export Desmond=${Desmond}
+    export viparr=${viparr}
+    export VIPARR_FFPATH=${VIPARR_FFPATH}
 
-function help (){
+function forcefield_info(){
+cat<<HELP
+The current force fields support in plmd:
+    S-OPLS: 
+        The force fields in Schrödinger packages, recommended to ligand-protein complex.
+    OPLS_2005: 
+        The default force field of Desmond package.
+    Amber: 
+        Recommended to protein, DNA, RNA, lipid and other systems.
+        Amber-ff19SB for protein, Amber-ffncaa for non-canonical aa, Amber-ffptm for 
+        post-translational modifications, amber1jc ion parameters adapt with spce, 
+        tip3p or tip4pew, Amber-bsc1 for DNA, Amber-tan2018 for RNA.
+    Charmm:
+        Recommended to protein, DNA, RNA, lipid, carbohydrate and other systems.
+        Charmm36m for protein, Charmm36 for carbohydrate, ions, lipid and nucleic acid.
+    DES-Amber:
+        Recommended to protein-protein complex.
+        DES-Amber for protein-protein complex.
+HELP
+}
+
+function help(){
 cat<<HELP
 
 Usage: plmd [OPTION] <parameter>
@@ -355,7 +415,8 @@ System Builder parameter:
 		If you want use Orthorhombic or Triclinic box, your parameter should be like "15.0 15.0 15.0"
   -R    Redistribute the mass of heavy atoms to bonded hydrogen atoms to slow-down high frequency motions.
   -F	Define a force field to build your systems. <OPLS_2005>
-		OPLS_2005, S-OPLS, OPLS3e, OPLS3, OPLS2 are recommended to receptor-ligand systems.
+		    OPLS_2005, S-OPLS are recommended to receptor-ligand systems.
+            Amber, Charmm, DES-Amber are recommended to other systems. Use -O to show more details.
 
 Simulation control parameter:
   -m	Enter the maximum simulation time for the Brownian motion simulation, in ps. <${mintime}>
@@ -376,16 +437,21 @@ Job control:
   -G	HOST of GPU queue, default is ${GPU_HOST}.
   -H    HOST of CPU queue, default is ${CPU_HOST}.
   -D	Your Desmond path. <${Desmond}>
+  -V    Your viparr path. <${viparr}>
+  -v    Your viparr force fields path. <${VIPARR_FFPATH}>
 
 Thank you for your using, If you found any question, Please contact wanglin3@shanghaitech.edu.cn.
 HELP
 }
 
-while getopts ":hi:S:nb:s:RF:m:t:T:N:P:L:C:f:o:H:G:D:qu" opt
+while getopts ":hi:S:nb:s:RF:m:t:T:N:P:L:C:f:o:H:G:D:quV:v:O" opt
 do
   case $opt in
     h)
         help
+        exit;;
+    O)
+        forcefield_info
         exit;;
     i)
         export input=$OPTARG;;
@@ -437,6 +503,10 @@ do
         export ffid=$OPTARG;;
     u)
         export trunoff_md=true;;
+    V)
+        export viparr=$OPTARG;;
+    v)
+        export VIPARR_FFPATH=$OPTARG;;
     ?)
       echo ""
       echo "Error: Do not use undefined options. Try -h."
@@ -446,7 +516,7 @@ do
 done
 
 # Check Desmond and hostfile
-if [ -d ${Desmond} ];then
+if [ -d ${Desmond}/ ];then
   if [ "${Desmond}" == "" ];then
     echo "The environment variable \${Desmond} not found. Please check the Desmond path in your ~/.bashrc."
     exit
@@ -494,38 +564,46 @@ else
     seedlist+=("$RANDOM");done
 fi
 
-#check params
-export fflist=("OPLS_2005" "OPLS3e" "OPLS4" "OPLS3" "OPLS2" "amber99SB-ILDN" "amber03" "amber99" "amber99SB" "charmm32" "charmm36_lipids" "S-OPLS")
+################################
+## Check and Parse Params
+################################
+export fflist=("OPLS_2005" "OPLS3e" "OPLS4" "OPLS3" "OPLS2" "Amber" "Charmm" "DES-Amber" "S-OPLS")
 export nagativeionlist=("F" "Cl" "Br" "I")
 export positiveionlist=("Na" "K" "Li" "Rb" "Cs" "Mg2" "Ca2" "Zn2" "Fe2" "Fe3")
 export all_ions_list=("F" "Cl" "Br" "I" "Na" "K" "Li" "Rb" "Cs" "Mg2" "Ca2" "Zn2" "Fe2" "Fe3")
-export solventlist=("SPC" "TIP3P" "TIP4P" "TIP5P" "DMSO" "METHANOL")
+export solventlist=("SPC" "SPCE" "TIP3P" "TIP4P" "TIP5P" "DMSO" "METHANOL")
 export boxlist=("orthorhombic" "triclinic" "dodecahedron_hexagon" "cubic")
 export waterlist=("SPC" "TIP3P" "TIP4P" "TIP5P")
 export first_input="yes"
 [ ${first_input} == "no" ] || checkparam $ffid "${fflist[*]}"
 [ ${first_input} == "no" ] || checkparam $boxshape "${boxlist[*]}"
-
-# Parse params
 if [ "$constraint"x == "true"x ];then
     export constraintDescription="restrain = {atom = \"asl:${constraintASL}\" force_constant = ${constraintForce}}"
 else
     export constraintDescription="restrain = none"
 fi
-
-if [ ${ffid:0:4} == "OPLS" ] || [ ${ffid} == "S-OPLS" ]; then
-    export override_forcefield=${ffid}
-else
-    export override_forcefield="OPLS_2005"
-fi
-
 for line in ${waterlist[@]}; do
 if [ "$solvent" == "$line" ];then
   export water="water = ${solvent}"
   break
 fi; done
 
-# report MD information
+################################
+## Assign Force Field
+################################
+if [ ${ffid:0:4} == "OPLS" ] || [ ${ffid} == "S-OPLS" ]; then
+    export override_forcefield=${ffid}
+    VIPPAR_ASSIGN="no"
+else
+    export override_forcefield="S-OPLS"
+    VIPPAR_ASSIGN="yes"
+    export PATH=${viparr}:$PATH
+    source ${viparr}/activate
+fi
+
+################################
+## Report MD Information
+################################
 cat<<OUT
 
 Jobs will run at ${GPU_HOST};
@@ -540,7 +618,9 @@ Rondom numbers list: ${seedlist[@]}
 
 OUT
 
-# Check input file
+################################
+## Check input file
+################################
 if ls $input >/dev/null 2>&1;then
   echo "These mae/cms files will be processed:"
   for i in `ls $input`; do echo $i;done
@@ -551,8 +631,58 @@ fi
 echo ""
 
 for i in `ls $input`; do
-    first_input="no"
+    ################################
+    ## Check input file and assign system build
+    ################################
+    if [ ${i##*.} == "cms" ]; then
+        SYS_BUILD="no"
+    elif [ ${i##*.} == "mae" ];then
+        SYS_BUILD="yes"
+    else
+        echo "ERROR: ${i##*.} is unvaild."
+        exit
+    fi
+    ################################
+    ## System Build
+    ################################
     input_file_path=`readlink -f $i`
+    if [ ${SYS_BUILD} == "yes" ];then
+        mkdir -p ${i%%.mae}-SYS_BUILD
+        cd ${i%%.mae}-SYS_BUILD
+        if [ ${System_Mode} == "INC" ];then
+            export SYS_pipeline="SPC:K:0.15-K-Cl"
+        elif [ ${System_Mode} == "OUC" ];then
+            export SYS_pipeline="SPC:Na:0.15-Na-Cl"
+        else
+            export SYS_pipeline=${System_Mode}
+        fi
+        set_msj
+        set_sys_build_msj
+        ${Desmond}/utilities/multisim -JOBNAME ${i%%.mae}-SYS_BUILD -HOST "${CPU_HOST}:3" -SUBHOST ${GPU_HOST} -maxjob 0 -m plmd.msj -c plmd.cfg -WAIT -lic DESMOND_ACADEMIC:16 -o ../${i%%.*}.cms ${input_file_path}
+        cd ..
+        system_file=`readlink -f ${i%%.*}.cms`
+    fi
+    system_file=${input_file_path}
+    ################################
+    ## Assign Force Fields
+    ################################
+    if [ ${VIPPAR_ASSIGN} == "yes" ];then 
+        assign_viparr ${system_file} "${i%%.*}_viparr.cms"
+        if [ ! -f "${i%%.*}_viparr.cms" ];then
+            echo "ERROR: Viparr Failed!"
+            exit
+        fi
+        ${Desmond}/run gen_fsys.py "${i%%.*}_viparr.cms"
+        system_file=`readlink -f ${i%%.*}_viparr.cms`
+    fi
+    ################################
+    ## Submit MD Simulations
+    ################################
+    if [ $trunoff_md == true ]; then
+        echo "Note: You turn off the MD simulation stage!"
+        continue
+    fi
+    ## Parse Seeds and mkdir
     for seed in ${seedlist[@]};do
         if [ -d ${i%%.*}-${seed}-md ];then
             rm -r ${i%%.*}-${seed}-md
@@ -562,43 +692,20 @@ for i in `ls $input`; do
             mkdir -p ${i%%.*}-${seed}-md
         fi
         cd ${i%%.*}-${seed}-md
-        gen_cfg
-cat<<MSJ1 > plmd.msj
-task {
-  task = "desmond:auto"
-  set_family = {
-    simulate = {
-    checkpt.write_last_step = no
-    }
-  }
-}
-MSJ1
-        if [ ${i##*.} == cms ]; then
-            echo "Put the ${i} to MD simulation."
-        elif [ ${i##*.} == mae ];then
-            echo "Put the ${i} to MD simulation."
-            if [ $System_Mode == "INC" ];then
-                export SYS_pipeline="SPC:K:0.15-K-Cl"
-            elif [ $System_Mode == "OUC" ];then
-                export SYS_pipeline="SPC:Na:0.15-Na-Cl"
-            else
-                export SYS_pipeline=$System_Mode
-            fi
-            sys_build
+        gen_cfg # Parse Seeds, temperature and md time
+        set_msj # Make a .msj file
+        if [ ${VIPPAR_ASSIGN} == "yes" ];then 
+            set_md
         else
-            continue
-        fi
-        if [ $trunoff_md == true ]; then
-            echo "Note: You turn off the MD simulations!"
-        else
+            assign_opls
             set_md
         fi
         if [ ${GPU_HOST} == "localhost" ];then
-            $Desmond/utilities/multisim -JOBNAME ${i%%.*}-${seed}-md -HOST "${CPU_HOST}:3" -SUBHOST ${GPU_HOST} -maxjob 0 -m plmd.msj -c plmd.cfg -WAIT -lic DESMOND_ACADEMIC:16 -o ../${i%%.*}-${seed}-md-out.cms ${input_file_path}
+            ${Desmond}/utilities/multisim -JOBNAME ${i%%.*}-${seed}-md -HOST "${CPU_HOST}:3" -SUBHOST ${GPU_HOST} -maxjob 0 -m plmd.msj -c plmd.cfg -WAIT -lic DESMOND_ACADEMIC:16 -o ../${i%%.*}-${seed}-md-out.cms ${system_file}
         else
-            $Desmond/utilities/multisim -JOBNAME ${i%%.*}-${seed}-md -HOST "${CPU_HOST}:3" -SUBHOST ${GPU_HOST} -maxjob 0 -m plmd.msj -c plmd.cfg -lic DESMOND_ACADEMIC:16 -o ../${i%%.*}-${seed}-md-out.cms ${input_file_path}
+            ${Desmond}/utilities/multisim -JOBNAME ${i%%.*}-${seed}-md -HOST "${CPU_HOST}:3" -SUBHOST ${GPU_HOST} -maxjob 0 -m plmd.msj -c plmd.cfg -lic DESMOND_ACADEMIC:16 -o ../${i%%.*}-${seed}-md-out.cms ${system_file}
         fi
-extend_to_time=`echo "${mdtime} * 2.0"|bc`
+        extend_to_time=`echo "${mdtime} * 2.0"|bc`
 cat<<EXTEND > extend.sh
 ${Desmond}/desmond -JOBNAME "${i%%.*}-${seed}-md" -HOST ${GPU_HOST} -restore ${i%%.*}-${seed}-md.cpt -in ${i%%.*}-${seed}-md-in.cms -cfg mdsim.last_time=${extend_to_time}
 EXTEND
