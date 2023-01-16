@@ -72,7 +72,7 @@ These options are supported by this script.
         Normal: Filter The Drug-like compounds and dock screening.
             "RDL+HTVS_Normal+QIKPROP+R5R+SP_ExtensionA"
         Local: Local docking and screening were carried out using the input ligand structure.
-             "HTVS_local+SP_local+MMGBSA_OPT"
+            "HTVS_local+SP_local+MMGBSA_OPT"
         Reference: Virtual Screening with reference ligand restrain.
             "HTVS_REF+SP_REF+QIKPROP+R5R"
         Prep_Normal: Virtual Screening for un-prepared compounds database.
@@ -80,7 +80,7 @@ These options are supported by this script.
         Normal_MMGBSA: Virtual Screening and MMGBSA re-scoring.
             "RDL+HTVS_Normal+QIKPROP+R5R+SP_ExtensionA+MMGBSA_EN"
         Cov_Screening: Virtual Screening to discover covalent durg.
-            "R+RDL+HTVS_Normal+SP_ExtensionA+CD"
+            "R+HTVS_Normal+SP_ExtensionA+SP_Enhanced"
         Induce_Fit_Screening: Induce fit screening.
             "IFT_pre+IFT"
         QM_Screening: Virtual Screening and QMMM re-docking.
@@ -111,7 +111,7 @@ These options are supported by this script.
             5R: Standard LIPINSKI 5 Rule, need QIKPROP.
             R5R: Rough 5 Rule, need QIKPROP.
             Oral: Retain compounds with Oral Absorption, need QIKPROP.
-            3R: Jorgensen’s rule of three, orally available, need QIKPROP.
+            3R: Jorgensen's rule of three, orally available, need QIKPROP.
             Star: Retain compounds similar to known drugs, need QIKPROP.
             Oral_Drug: Combine 3R and 5R but allow one dissatisfy term.
             BBB: Filter for Blood-brain barrier, need QIKPROP.
@@ -200,7 +200,9 @@ Input parameter:
         Use a file name (Multiple files are wrapped in "", and split by ' ') or regular expression to represent your input Grid file, default is *.zip.
   -D    Which databases do you want to screen? The Database basic path is <$Database_Path>.
         These database are Supported:
-            ${Database_list}
+HELP
+ls -w 150 ${Database_Path}  # echo "${Database_list}"
+cat<<HELP
   -d    Provide your own database path, the compounds files are recommended as maegz or SDF file format.
   -R    Optional, reference Ligands correlated with the grid or use for RMSD calculation. 
             As *.mae, *.maegz (for query structure) or *.phypo (for pharmacophore hypothesis).
@@ -350,7 +352,7 @@ Parse_Running_Mode(){
     elif [ $Running_Mode == "Induce_Fit_Screening" ]; then
         Pipeline="IFT_pre+IFT"
     elif [ $Running_Mode == "Cov_Screening" ]; then
-        Pipeline="R+RDL+HTVS_Normal+SP_ExtensionA+CD"
+        Pipeline="R+HTVS_Normal+SP_ExtensionA+SP_Enhanced"
     elif [ $Running_Mode == "Fast" ]; then
         Pipeline="HTVS_Normal+SP_Normal"
     elif [ $Running_Mode == "QM_Screening" ]; then
@@ -761,15 +763,11 @@ cat<<IONIZE >> ${Inp_Name}
 [STAGE:POSTLIGPREP]
     STAGECLASS   ligprep.PostLigPrepStage
     INPUTS   IONIZE_OUT,
-    OUTPUTS   POSTIONIZE_OUT,
+    OUTPUTS   LIGPREP_OUT,
     UNIQUEFIELD   s_vsw_compound_code
     OUTVARIANTFIELD   s_vsw_variant
     PRESERVE_NJOBS   YES
     REMOVE_PENALIZED_STATES   YES
-[STAGE:RestoreTitle]
-    STAGECLASS  gencodes.RestoreTitlesStage
-    INPUTS   POSTIONIZE_OUT,
-    OUTPUTS     LIGPREP_OUT,
 [USEROUTS:${task}]
     USEROUTS   LIGPREP_OUT,
     STRUCTOUT   LIGPREP_OUT
@@ -808,15 +806,11 @@ cat<<EPIK4 >> ${Inp_Name}
 [STAGE:POSTLIGPREP]
     STAGECLASS   ligprep.PostLigPrepStage
     INPUTS   EPIK4_OUT,
-    OUTPUTS   POSTEPIK4_OUT,
+    OUTPUTS   LIGPREP_OUT,
     UNIQUEFIELD   s_vsw_compound_code
     OUTVARIANTFIELD   s_vsw_variant
     PRESERVE_NJOBS   YES
     REMOVE_PENALIZED_STATES   YES
-[STAGE:RestoreTitle]
-    STAGECLASS  gencodes.RestoreTitlesStage
-    INPUTS   POSTEPIK4_OUT,
-    OUTPUTS     LIGPREP_OUT,
 [USEROUTS:${task}]
     USEROUTS   LIGPREP_OUT,
     STRUCTOUT   LIGPREP_OUT
@@ -855,20 +849,22 @@ cat<<EPIK32 >> ${Inp_Name}
 [STAGE:POSTLIGPREP]
     STAGECLASS   ligprep.PostLigPrepStage
     INPUTS   EPIK32_OUT,
-    OUTPUTS   POSTEPIK32_OUT,
+    OUTPUTS   LIGPREP_OUT,
     UNIQUEFIELD   s_vsw_compound_code
     OUTVARIANTFIELD   s_vsw_variant
     MAXSTEREO   32
     PRESERVE_NJOBS   YES
     REMOVE_PENALIZED_STATES   YES
-[STAGE:RestoreTitle]
-    STAGECLASS  gencodes.RestoreTitlesStage
-    INPUTS   POSTEPIK32_OUT,
-    OUTPUTS     LIGPREP_OUT,
 [USEROUTS:${task}]
     USEROUTS   LIGPREP_OUT,
     STRUCTOUT   LIGPREP_OUT
 EPIK32
+# cat<<EOF
+# [STAGE:RestoreTitle]
+#     STAGECLASS  gencodes.RestoreTitlesStage
+#     INPUTS   POSTEPIK32_OUT,
+#     OUTPUTS     LIGPREP_OUT,
+# EOF
     Ligand_name="LIGPREP_OUT"
     TO_RMSD="${Ligand_name}"
 }
@@ -3171,7 +3167,10 @@ generate_INP(){
     if [ ${shape_screen_swith} == true ];then
         Shape
     fi
-    echo "########## Virtual Screening Workflow Input File ###############" > ${Inp_Name}
+    echo "########## Virtual Screening Workflow Input File ###############
+### to restart: \$SCHRODINGER/pipeline -RESTART ${Job_Title}.inp
+######################################################################
+    " > ${Inp_Name}
     if [ ! ${INPUT} == "None" ];then
         setGrid
     fi
