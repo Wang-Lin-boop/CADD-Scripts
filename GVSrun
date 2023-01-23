@@ -116,6 +116,8 @@ These options are supported by this script.
             Oral_Drug: Combine 3R and 5R but allow one dissatisfy term.
             BBB: Filter for Blood-brain barrier, need QIKPROP.
             MW: Filter compounds by Molecular weight, need -W option.
+            PosMol: retain the positively charged compounds.
+            NegMol: retain the negatively charged compounds.
 
         @LigPrep: Use LigPrep to prepare filtered structures. Related to -r option.
             IONIZE: Generate ionization states when using Ionizer.
@@ -537,7 +539,7 @@ cat<<BBB >> ${Inp_Name}
     STAGECLASS   filtering.LigFilterStage
     INPUTS   ${Ligand_name},
     OUTPUTS   BBB_OUT,
-    CONDITIONS   "r_qp_mol_MW <= 450", "r_qp_QPlogPo/w <= 5 AND > 2", "r_qp_PSA <= 90", "Num_rotatable_bonds <= 8","r_qp_donorHB <= 3", "r_qp_QPlogBB >= -3.0 AND <= 1.2", "r_qp_QPPMDCK >= 25"
+    CONDITIONS   "Num_rotatable_bonds <= 8", "r_qp_QPlogBB >= -3.0 AND <= 1.2", "r_qp_QPPMDCK >= 25"
 [USEROUTS:${task}]
     USEROUTS   BBB_OUT,
     STRUCTOUT   BBB_OUT
@@ -635,6 +637,28 @@ cat<<RDL >> ${Inp_Name}
     CONDITIONS   "Molecular_weight <= 650", "Num_rotatable_bonds <= 10", "Num_rings <= 6"
 RDL
     Ligand_name="RDL_OUT"
+}
+
+PosMol(){
+cat<<RDL >> ${Inp_Name}
+[STAGE:PosMol]
+    STAGECLASS   filtering.LigFilterStage
+    INPUTS   ${Ligand_name},
+    OUTPUTS   PosMol_OUT,
+    CONDITIONS   "Total_charge > 0"
+RDL
+    Ligand_name="PosMol_OUT"
+}
+
+NegMol(){
+cat<<RDL >> ${Inp_Name}
+[STAGE:NegMol]
+    STAGECLASS   filtering.LigFilterStage
+    INPUTS   ${Ligand_name},
+    OUTPUTS   NegMol_OUT,
+    CONDITIONS   "Total_charge < 0"
+RDL
+    Ligand_name="NegMol_OUT"
 }
 
 Fragment(){
