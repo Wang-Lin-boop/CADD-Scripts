@@ -222,7 +222,7 @@ cat<<HELP
         *QM_Screening: Virtual Screening and QMMM re-docking.
         Local: Local docking and screening were carried out using the input ligand structure.
         Shape_Screening: perform screening based on reference ligand shape.
-        Advance: dock screening and clustering.
+        Advance: advance docking screening.
         Advance_Shape_Screening: perform screening based on reference ligand shape.
     @ or Custom Running Mode, e.g. -m "EDL+R+HTVS+CD"
 
