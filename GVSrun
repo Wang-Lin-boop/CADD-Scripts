@@ -120,7 +120,7 @@ These options are supported by this script.
             PosMol: retain the positively charged compounds.
             NegMol: retain the negatively charged compounds.
 
-        @LigPrep: Use LigPrep to prepare filtered structures. Related to -r option.
+        @LigPrep: Use LigPrep to prepare filtered structures.
             IONIZE: Generate ionization states when using Ionizer.
             EPIK4: Use Epik for generating ionization and tautomeric states.
             EPIK32: Use Epik for generating ionization and tautomeric states.
