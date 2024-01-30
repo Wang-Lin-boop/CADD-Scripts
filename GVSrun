@@ -174,7 +174,7 @@ These options are supported by this script.
             # Radial, dendritic, or MolPrint2D often give the best results.
 
         @Advanced_Docking: Advanced docking to generate Induce-Fited/Covalent complex structures.
-        !NOTE: The Advanced_Docking Taskes can only receive a small number of ligands (< 200 ~ 2000). 
+        !NOTE: The Advanced_Docking Tasks can only receive a small number of ligands (< 200 ~ 2000). 
             IFT: Induce Fit Refinement.
             CD: Covalent Docking to ser, cys or lys. Depend on the -C option.
                 Contains Michael_Addition, Epoxide_Opening, and Conjugate_Addition, for cys or ser.
