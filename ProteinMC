@@ -1,0 +1,349 @@
+#!/bin/bash
+#########################################################################
+# proteinMC, Version 1.0.0
+# 2022, ShanghaiTech University, Wang Lin
+# Email: wanglin3@shanghaitech.edu.cn
+#########################################################################
+
+
+CPU_HOST=CPU
+NJOBS=30
+Job_Type="MC"
+Force_Field="S-OPLS"
+Rosetta_score="ref2015_cart"
+backbone_sampling="yes"
+SCHRODINGER=${SCHRODINGER}
+MC_Steps=50
+output_num=3
+random_seed=yes
+use_membrane="no"
+Range="all"
+constraints=false
+constraints_force=10.00
+constraints_tolerance=0.00
+rosetta_app=${rosetta_app}
+rosetta_db=${rosetta_db}
+rosetta_version=mpi  # the install version of rosetta: mpi or static.
+MPI_mode=false
+comp1="A"
+comp2="B"
+
+help(){
+cat << EOF
+
+Prime Monte Carlo simulation.
+
+Usage: proteinMC -i <structure>.mae -s 100 -r -H <CPU> -N 30 
+
+Required Options:
+    -i      Input sturctural file in *.mae or dir for *.pdb, required.
+    -t      Job type for Monte Carlo simulation: <${Job_Type}>
+            Prime Global Refinement:
+                MC, hybird MC; 
+                SIDE_PRED, sidechain refine with backbone sampling.
+                SIDE_OPT, sidechain refine without backbone sampling.
+            Rosetta Global Refinement:
+                Fast_Relax, protein all-atom relax with backbone sampling.
+                Relax, large cycle number fast relax.
+                PPI_Relax, relax protein-protein interface.
+            PPI refinement:
+                PPI_MMGBSA, MM-GBSA for protein-protein interface. 
+                FlexPepDock, protein-peptide global docking.
+                FlexPepRefine, protein-peptide local refinement.
+                PPI_Dock, protein-protein global docking.
+                PPI_Refine, protein-protein docking refinement. 
+Environment Options (MC, SIDE_PRED, SIDE_OPT, and PPI_MMGBSA):
+    -m      Use this option to consider the membrane in the simulation, 
+            which requires setting the membrane position in GUI.
+PPI Refinement Options (PPI_MMGBSA, FlexPepDock, FlexPepRefine, PPI_Dock and PPI_Refine):
+    -1      The chain name for component 1 (receptor chain). <${comp1}>
+    -2      The chain name for component 2 (ligand chain or peptide). <${comp2}>
+Prime Global Refinement Options (MC, SIDE_PRED, and SIDE_OPT):
+    -R      ASL for refine range. <${Range}>
+    -s      Steps of MC simulations. <${MC_Steps}>
+    -r      Use the random seed. <${random_seed}>
+    -c      Set the position constraints for a ASL, such as "backbone".
+    -f      Set the force for position constraints. <${constraints_force}>
+    -d      Set the distance tolerance for position constraints. <${constraints_tolerance}>
+Output Options:
+    -n      Number of output conformation per input structure. <${output_num}>
+Job Control Options:
+    -H      Host for CPU queue. <${CPU_HOST}>
+    -S      Path to your Schrodinger package. <${SCHRODINGER}>
+    -A      Path to rosetta app, default version is mpi. <${rosetta_app}>
+    -B      Path to rosetta database. <${rosetta_db}>
+    -N      Number of subjobs(CPU cores). <${NJOBS}>
+
+Thank you for your using, If you found any problem, Please contact wanglin3@shanghaitech.edu.cn.
+EOF
+}
+
+while getopts ":hi:s:H:S:N:ms:rn:c:f:d:R:t:A:B:1:2:" opt
+do
+  case $opt in
+    h)
+        help
+        exit;;
+    H)
+        CPU_HOST=$OPTARG;;
+    N)
+        NJOBS=$OPTARG;;
+    S)
+        SCHRODINGER=$OPTARG;;
+    i)
+        input_file=`readlink -f $OPTARG`;;
+    t)
+        Job_Type=$OPTARG;;
+    m)
+        use_membrane="yes";;
+    s)
+        MC_Steps=$OPTARG;;
+    r)
+        random_seed="yes";;
+    n)
+        output_num=$OPTARG;;
+    1)
+        comp1=$OPTARG;;
+    2)
+        comp2=$OPTARG;;
+    c)
+        constraints=true
+        constraints_asls=$OPTARG;;
+    f)
+        constraints_force=$OPTARG;;
+    d)
+        constraints_tolerance=$OPTARG;;
+    R)
+        Range=$OPTARG;;
+    A)
+        rosetta_app=$OPTARG;;
+    B)
+        rosetta_db=$OPTARG;;
+    ?)
+        echo ""
+        echo "Error: Do not use undefined options."
+        echo ""
+        help
+        exit;;
+    esac
+done
+
+function PrimeMC(){
+job_name="$(basename ${input_file%%.*})_${Job_Type}"
+if [ ${input_file##*.} == "mae" ] || [ ${input_file##*.} == "maegz" ];then
+    echo ""
+elif [ ${input_file##*.} == "pdb" ];then
+    $SCHRODINGER/utilities/structconvert ${input_file} $(basename ${input_file%%.*}).mae
+    export input_file=`readlink -f $(basename ${input_file%%.*}).mae`
+elif [ -d ${input_file} ];then
+    $SCHRODINGER/utilities/structcat -ipdb ${input_file}/*.pdb -omae ${job_name}_in.mae
+    export input_file=`readlink -f ${job_name}_in.mae`
+fi
+if [ ${Job_Type} == "PPI_MMGBSA" ];then
+    echo "
+Set up a MM-GBSA calculation:
+Use_membrane: ${use_membrane}
+"
+    ${SCHRODINGER}/utilities/prepwizard -fillsidechains -disulfides -rehtreat -epik_pH 7.0 -epik_pHt 0.6 -samplewater -propka_pH 7.0 -f S-OPLS -rmsd 0.3 -WAIT -HOST ${CPU_HOST} -NJOBS ${NJOBS} -keepfarwat -glycosylation -delwater_hbond_cutoff 3 ${input_file} ${job_name}-reprep.mae
+    if [ ${use_membrane} == "yes" ];then
+        ${SCHRODINGER}/prime_mmgbsa -job_type REAL_MIN -rflexdist 5 -jobname "${job_name}-MMGBSA" -ligand "chain.name ${comp2}" -membrane -HOST "${CPU_HOST}:${NJOBS}" -NJOBS ${NJOBS} ${job_name}-reprep.mae
+    else
+        ${SCHRODINGER}/prime_mmgbsa -job_type REAL_MIN -rflexdist 5 -jobname "${job_name}-MMGBSA" -ligand "chain.name ${comp2}" -HOST "${CPU_HOST}:${NJOBS}" -NJOBS ${NJOBS} ${job_name}-reprep.mae
+    fi
+else
+echo "
+Set up a Prime ${Job_Type} simulation:
+Refine_Range:	${Range}
+Use_random_seed:	${random_seed}
+Use_membrane: ${use_membrane}
+Use_constraints: ${constraints}
+Steps: ${MC_Steps}
+"
+    if [ ${Job_Type} == "MC" ];then
+cat << EOF > ${job_name}.inp
+STRUCT_FILE	${input_file}
+JOB_TYPE	REFINE
+PRIME_TYPE	MC
+SELECT	asl=${Range}
+NSTEPS	${MC_Steps}
+PROB_SIDEMC	0.000000
+PROB_RIGIDMC	0.000000
+PROB_HMC	1.000000
+TEMP_HMC	900.000000
+FIND_BEST_STRUCTURE	yes
+NUM_OUTPUT_STRUCT	${output_num}
+USE_CRYSTAL_SYMMETRY	no
+USE_RANDOM_SEED	${random_seed}
+SEED	0
+OPLS_VERSION ${Force_Field}
+EXT_DIEL	80.00
+USE_MEMBRANE	${use_membrane}
+EOF
+    elif [ ${Job_Type} == "SIDE_PRED" ];then
+cat << EOF > ${job_name}.inp
+STRUCT_FILE	${input_file}
+JOB_TYPE	REFINE
+PRIME_TYPE	SIDE_PRED
+SELECT	asl=${Range}
+NUM_SC_OUTPUT_STRUCT	${output_num}
+USE_CRYSTAL_SYMMETRY	no
+USE_RANDOM_SEED	${random_seed}
+SEED	0
+OPLS_VERSION ${Force_Field}
+EXT_DIEL	80.00
+USE_MEMBRANE	${use_membrane}
+SAMPLE_BACKBONE ${backbone_sampling}
+BACKBONE_LEN 3
+EOF
+    fi
+    if [ ${constraints} == true ];then
+        echo "CONSTRAINT_0 asl=${constraints_asls};${constraints_force};${constraints_tolerance}" >> ${job_name}.inp
+    fi
+    ${SCHRODINGER}/prime -HOST "${CPU_HOST}:${NJOBS}" -NJOBS ${NJOBS} ${job_name}.inp
+fi
+}
+
+function RosettaMC(){
+    job_name="$(basename ${input_file%%.*})_${Job_Type}"
+    mkdir -p ${job_name}_OUT
+    echo "
+Set up a Rosetta MC simulation:
+nstruct for per input: ${output_num}
+output directory: ${job_name}_OUT
+    "
+    if [ ${input_file##*.} == "mae" ] || [ ${input_file##*.} == "maegz" ];then
+        mkdir -p $(basename ${input_file%%.*})
+        $SCHRODINGER/utilities/structconvert -split-nstructures 1 ${input_file} $(basename ${input_file%%.*})/$(basename ${input_file%%.*}).mae
+        ls $(basename ${input_file%%.*})/$(basename ${input_file%%.*})-*.mae | parallel -j 1 $SCHRODINGER/utilities/structconvert $(basename ${input_file%%.*})/{} $(basename ${input_file%%.*})/{.}.pdb
+        ls $(basename ${input_file%%.*})/*.pdb | parallel -j 1 echo "$(basename ${input_file%%.*})/{}" >> ${job_name}_input.list
+    elif [ ${input_file##*.} == "pdb" ];then
+        export MPI_mode=true
+    elif [ -d ${input_file} ];then
+        ls ${input_file} | parallel -j 1 echo "${input_file}/{}" >> ${job_name}_input.list
+    fi
+    if [ ${CPU_HOST} == "CPU" ];then 
+cat << EOF > ${job_name}.pbs
+#PBS -N ${job_name}
+#PBS -l nodes=1:ppn=${NJOBS}:centos7
+#PBS -S /bin/bash
+#PBS -j oe
+#PBS -l walltime=360:00:00
+#PBS -q siais_pub_cpu
+
+module load mpi/openmpi/4.1.1
+module load compiler/gnu/8.3.0
+cd \$PBS_O_WORKDIR
+EOF
+    elif [ ${CPU_HOST} == "amdnode" ];then 
+cat << EOF > ${job_name}.pbs
+#PBS -N ${job_name}
+#PBS -l nodes=1:ppn=${NJOBS}
+#PBS -S /bin/bash
+#PBS -j oe
+#PBS -l walltime=360:00:00
+#PBS -q amdnode
+
+module load mpi/openmpi/4.1.1
+module load compiler/gnu/8.3.0
+cd \$PBS_O_WORKDIR
+EOF
+    elif [ ${CPU_HOST} == "fat" ];then 
+cat << EOF > ${job_name}.pbs
+#PBS -N ${job_name}
+#PBS -l nodes=1:ppn=${NJOBS}
+#PBS -S /bin/bash
+#PBS -j oe
+#PBS -l walltime=360:00:00
+#PBS -q pub_fat
+
+module load mpi/openmpi/4.1.1
+module load compiler/gnu/8.3.0
+cd \$PBS_O_WORKDIR
+EOF
+    else
+        echo "Error: Rosetta job cannot run on ${CPU_HOST}"
+    fi
+    if [ ${Job_Type} == "FlexPepDock" ] || [ ${Job_Type} == "FlexPepRefine" ] || [ ${Job_Type} == "PPI_Dock" ] || [ ${Job_Type} == "PPI_Refine" ]; then
+        if [ ${MPI_mode} == "true" ];then
+            if [ ${Job_Type} == "FlexPepDock" ]; then
+                echo "
+                mpirun -np ${NJOBS} ${rosetta_app}/FlexPepDocking.${rosetta_version}.linuxgccrelease -database $rosetta_db -in:file:s ${input_file} -out:file:scorefile ${job_name}_score.sc -out:path:pdb ${job_name}_OUT/ -nstruct ${output_num} -ex1 -ex2aro -ignore_zero_occupancy false -score:weights ${Rosetta_score} -receptor_chain ${comp1} -flexPepDocking:peptide_chain ${comp2} -flexPepDocking:lowres_abinitio -frag3 frags/frags.3mers.offset -frag9 frags/frags.9mers.offset -flexPepDocking:frag5 frags/frags.5mers.offset -flexPepDocking:frag5_weight 0.25 -flexPepDocking:frag9_weight 0.1 -flexPepDocking:pep_refine 
+                ls ${job_name}_OUT/ | parallel -j ${NJOBS} ${rosetta_app}/InterfaceAnalyzer.${rosetta_version}.linuxgccrelease -s ${job_name}_OUT/{}  -out:file:score_only ${job_name}_Interface_Score.sc -interface ${comp1}_${comp2} -compute_packstat true -tracer_data_print false -pack_separated true -packstat::oversample 100  -add_regular_scores_to_scorefile true -pose_metrics::interface_cutoff 8.0 -sasa_calculator_probe_radius 1.4 -atomic_burial_cutoff 0.01 -no_nstruct_label true -score:weights ${Rosetta_score} 
+                " >> ${job_name}.pbs
+            elif [ ${Job_Type} == "FlexPepRefine" ]; then
+                echo "
+                mpirun -np ${NJOBS} ${rosetta_app}/FlexPepDocking.${rosetta_version}.linuxgccrelease -database ${rosetta_db} -in:file:s ${input_file} -out:file:scorefile ${job_name}_score.sc -out:path:pdb ${job_name}_OUT/ -nstruct ${output_num} -ex1 -ex2aro -ignore_zero_occupancy false -score:weights ${Rosetta_score} -receptor_chain ${comp1} -flexPepDocking:peptide_chain ${comp2} -flexPepDocking:pep_refine 
+                ls ${job_name}_OUT/ | parallel -j ${NJOBS} ${rosetta_app}/InterfaceAnalyzer.${rosetta_version}.linuxgccrelease -s ${job_name}_OUT/{}  -out:file:score_only ${job_name}_Interface_Score.sc -interface "${comp1}_${comp2}" -compute_packstat true -tracer_data_print false -pack_separated true -packstat::oversample 100  -add_regular_scores_to_scorefile true -pose_metrics::interface_cutoff 8.0 -sasa_calculator_probe_radius 1.4 -atomic_burial_cutoff 0.01 -no_nstruct_label true -score:weights ${Rosetta_score} 
+                " >> ${job_name}.pbs
+            elif [ ${Job_Type} == "PPI_Dock" ]; then
+                echo "
+                mpirun -np ${NJOBS} ${rosetta_app}/docking_prepack_protocol.${rosetta_version}.linuxgccrelease -docking:partners "${comp1}_${comp2}" -docking::dock_rtmin true -in:file:s ${input_file} -ex1 -ex2aro -score:weights ${Rosetta_score} -ignore_zero_occupancy false
+                mpirun -np ${NJOBS} ${rosetta_app}/docking_protocol.${rosetta_version}.linuxgccrelease -database ${rosetta_db} -in:file:s $(basename ${input_file%%.pdb})_0001.pdb -out:file:scorefile ${job_name}_score.sc -out:path:pdb ${job_name}_OUT/ -nstruct ${output_num} -ex1 -ex2aro -ignore_zero_occupancy false -score:weights ${Rosetta_score} -partners "${comp1}_${comp2}" -dock_pert 3 8 -randomize2 -ex1 -ex2aro -spin -use_input_sc -dock_mcm_trans_magnitude 0.7 -dock_mcm_rot_magnitude 5.0 -mh:path:scores_BB_BB ${rosetta_db}/additional_protocol_data/motif_dock/xh_16_ -mh:score:use_ss1 false -mh:score:use_ss2 false -mh:score:use_aa1 true -mh:score:use_aa2 true -docking_low_res_score motif_dock_score
+                ls ${job_name}_OUT/ | parallel -j ${NJOBS} ${rosetta_app}/InterfaceAnalyzer.${rosetta_version}.linuxgccrelease -s ${job_name}_OUT/{}  -out:file:score_only ${job_name}_Interface_Score.sc -interface "${comp1}_${comp2}" -compute_packstat true -tracer_data_print false -pack_separated true -packstat::oversample 100  -add_regular_scores_to_scorefile true -pose_metrics::interface_cutoff 8.0 -sasa_calculator_probe_radius 1.4 -atomic_burial_cutoff 0.01 -no_nstruct_label true -score:weights ${Rosetta_score} 
+                " >> ${job_name}.pbs
+            elif [ ${Job_Type} == "PPI_Refine" ]; then
+                echo "
+                mpirun -np ${NJOBS} ${rosetta_app}/docking_prepack_protocol.${rosetta_version}.linuxgccrelease -docking:partners "${comp1}_${comp2}" -docking::dock_rtmin true -in:file:s ${input_file} -ex1 -ex2aro -ignore_zero_occupancy false -score:weights ${Rosetta_score}
+                mpirun -np ${NJOBS} ${rosetta_app}/docking_protocol.${rosetta_version}.linuxgccrelease -database ${rosetta_db} -in:file:s $(basename ${input_file%%.pdb})_0001.pdb -out:file:scorefile ${job_name}_score.sc -out:path:pdb ${job_name}_OUT/ -nstruct ${output_num} -ex1 -ex2aro -ignore_zero_occupancy false -score:weights ${Rosetta_score} -partners "${comp1}_${comp2}" -dock_pert 3 8 -use_input_sc
+                ls ${job_name}_OUT/ | parallel -j ${NJOBS} ${rosetta_app}/InterfaceAnalyzer.${rosetta_version}.linuxgccrelease -s ${job_name}_OUT/{}  -out:file:score_only ${job_name}_Interface_Score.sc -interface "${comp1}_${comp2}" -compute_packstat true -tracer_data_print false -pack_separated true -packstat::oversample 100  -add_regular_scores_to_scorefile true -pose_metrics::interface_cutoff 8.0 -sasa_calculator_probe_radius 1.4 -atomic_burial_cutoff 0.01 -no_nstruct_label true -score:weights ${Rosetta_score} 
+                " >> ${job_name}.pbs
+            fi
+        else
+            echo "Error: must to specify only one pdb file path for docking mode!"
+            exit
+        fi
+    else
+        if [ ${MPI_mode} == "true" ];then
+            if [ ${Job_Type} == "Fast_Relax" ]; then
+                echo "
+                mpirun -np ${NJOBS} $rosetta_app/relax.${rosetta_version}.linuxgccrelease -database $rosetta_db -in:file:s ${input_file} -out:file:scorefile ${job_name}_score.sc -out:path:pdb ${job_name}_OUT/ -nstruct ${output_num} -ex1 -ex2aro -ignore_zero_occupancy false -score:weights ${Rosetta_score} -relax:jump_move true -relax:bb_move true -relax:chi_move true -relax:dualspace true -relax::minimize_bond_angles -relax:fast
+                " >> ${job_name}.pbs
+            elif [ ${Job_Type} == "Relax" ]; then
+                echo "
+            mpirun -np ${NJOBS} $rosetta_app/relax.${rosetta_version}.linuxgccrelease -database $rosetta_db -in:file:s ${input_file} -out:file:scorefile ${job_name}_score.sc -out:path:pdb ${job_name}_OUT/ -nstruct ${output_num} -ex1 -ex2aro -ignore_zero_occupancy false -score:weights ${Rosetta_score} -relax:jump_move true -relax:bb_move true -relax:chi_move true -relax:dualspace true -relax::minimize_bond_angles -relax:thorough
+                " >> ${job_name}.pbs
+            elif [ ${Job_Type} == "PPI_Relax" ]; then
+                echo "
+                mpirun -np ${NJOBS} $rosetta_app/relax.${rosetta_version}.linuxgccrelease -database $rosetta_db -in:file:s ${input_file} -out:file:scorefile ${job_name}_score.sc -out:path:pdb ${job_name}_OUT/ -nstruct ${output_num} -ex1 -ex2aro -ignore_zero_occupancy false -score:weights ${Rosetta_score} -relax:jump_move true -relax:bb_move true -relax:chi_move true -relax:dualspace true -relax::minimize_bond_angles -relax:script InterfaceRelax2019
+                " >> ${job_name}.pbs
+            fi
+        else
+            if [ ${Job_Type} == "Fast_Relax" ]; then
+                echo "
+                cat ${job_name}_input.list | parallel -j ${NJOBS} $rosetta_app/relax.${rosetta_version}.linuxgccrelease -database $rosetta_db -in:file:s {} -out:file:scorefile ${job_name}_score.sc -out:path:pdb ${job_name}_OUT/ -nstruct ${output_num} -ex1 -ex2aro -ignore_zero_occupancy false -score:weights ${Rosetta_score} -relax:jump_move true -relax:bb_move true -relax:chi_move true -relax:dualspace true -relax::minimize_bond_angles -relax:fast
+                " >> ${job_name}.pbs
+            elif [ ${Job_Type} == "Relax" ]; then
+                echo "
+                cat ${job_name}_input.list | parallel -j ${NJOBS} $rosetta_app/relax.${rosetta_version}.linuxgccrelease -database $rosetta_db -in:file:s {} -out:file:scorefile ${job_name}_score.sc -out:path:pdb ${job_name}_OUT/ -nstruct ${output_num} -ex1 -ex2aro -ignore_zero_occupancy false -score:weights ${Rosetta_score} -relax:jump_move true -relax:bb_move true -relax:chi_move true -relax:dualspace true -relax::minimize_bond_angles -relax:thorough
+                " >> ${job_name}.pbs
+            elif [ ${Job_Type} == "PPI_Relax" ]; then
+                echo "
+                cat ${job_name}_input.list | parallel -j ${NJOBS} $rosetta_app/relax.${rosetta_version}.linuxgccrelease -database $rosetta_db -in:file:s {} -out:file:scorefile ${job_name}_score.sc -out:path:pdb ${job_name}_OUT/ -nstruct ${output_num} -ex1 -ex2aro -ignore_zero_occupancy false -score:weights ${Rosetta_score} -relax:jump_move true -relax:bb_move true -relax:chi_move true -relax:dualspace true -relax::minimize_bond_angles -relax:script InterfaceRelax2019
+                " >> ${job_name}.pbs
+            fi
+        fi
+    fi
+    qsub ${job_name}.pbs
+}
+
+if [ ${Job_Type} == "MC" ]; then
+    Job_Type="MC"
+    PrimeMC
+elif [ ${Job_Type} == "PPI_MMGBSA" ]; then
+    Job_Type="PPI_MMGBSA"
+    PrimeMC
+elif [ ${Job_Type} == "SIDE_PRED" ]; then
+    Job_Type="SIDE_PRED"
+    backbone_sampling="yes"
+    PrimeMC
+elif [ ${Job_Type} == "SIDE_OPT" ]; then 
+    Job_Type="SIDE_PRED"
+    backbone_sampling="no"
+    PrimeMC
+elif [ ${Job_Type} == "Fast_Relax" ] || [ ${Job_Type} == "PPI_Relax" ] || [ ${Job_Type} == "Relax" ] || [ ${Job_Type} == "FlexPepDock" ] || [ ${Job_Type} == "FlexPepRefine" ] || [ ${Job_Type} == "PPI_Dock" ] || [ ${Job_Type} == "PPI_Refine" ]; then
+    RosettaMC
+else
+    echo "Error: Unknown Option: ${Job_Type}"
+fi
+
+
