@@ -120,7 +120,7 @@ These options are supported by this script.
             PosMol: retain the positively charged compounds.
             NegMol: retain the negatively charged compounds.
 
-        @LigPrep: Use LigPrep to prepare filtered structures.
+        @LigPrep: Use LigPrep to prepare filtered structures. Related to -r option.
             IONIZE: Generate ionization states when using Ionizer.
             EPIK4: Use Epik for generating ionization and tautomeric states.
             EPIK32: Use Epik for generating ionization and tautomeric states.
@@ -174,7 +174,7 @@ These options are supported by this script.
             # Radial, dendritic, or MolPrint2D often give the best results.
 
         @Advanced_Docking: Advanced docking to generate Induce-Fited/Covalent complex structures.
-        !NOTE: The Advanced_Docking Tasks can only receive a small number of ligands (< 200 ~ 2000). 
+        !NOTE: The Advanced_Docking Taskes can only receive a small number of ligands (< 200 ~ 2000). 
             IFT: Induce Fit Refinement.
             CD: Covalent Docking to ser, cys or lys. Depend on the -C option.
                 Contains Michael_Addition, Epoxide_Opening, and Conjugate_Addition, for cys or ser.
@@ -224,6 +224,7 @@ cat<<HELP
         Shape_Screening: perform screening based on reference ligand shape.
         Advance: advance docking screening.
         Advance_Shape_Screening: perform screening based on reference ligand shape.
+        GeminiMol_Advance: perform advance docking screening with GeminiMol output.
     @ or Custom Running Mode, e.g. -m "EDL+R+HTVS+CD"
 
 Control parameters:
@@ -369,6 +370,8 @@ Parse_Running_Mode(){
         Pipeline="HTVS_Shape+SP_Shape"
     elif [ $Running_Mode == "LocalShape_Screening" ];then
         Pipeline="PhaseShape+HTVS_local+SP_local"
+    elif [ $Running_Mode == "GeminiMol_Advance" ];then
+        Pipeline="No_Dup+RDL+EPIK4+HTVS_Normal+QIKPROP+R5R+SP_ExtensionA+SP_Enhanced"
     else 
         Pipeline=$Running_Mode
         Running_Mode="User_Defined"
@@ -461,6 +464,13 @@ SETDB
 [SET:INPUT_Ligands]
     VARCLASS    Structures
     FILES   ${Database_Location}, 
+SETDB
+    elif [ ${Database_Location##*.} == "csv" ];then
+        structconvert -smi SMILES -name ID $Database_Location  ${Database_Location%.*}.sdf
+        cat<<SETDB >> ${Inp_Name}
+[SET:INPUT_Ligands]
+    VARCLASS    Structures
+    FILES   ${Database_Location%.*}.sdf,
 SETDB
     elif [ -d ${Database_Location} ]; then
         cat<<SETDB >> ${Inp_Name}
@@ -2806,8 +2816,6 @@ cat<<IFT >> ${Inp_Name}
     STAGECLASS  prime.PrimeStage
     INPUTS  TO_INDUCE_FIT
     OUTPUTS INDUCE_FIT_OUT
-    MAX_JOBS    ${Prime}
-    THREADS    ${Prime}
     PRIME_TYPE  REAL_MIN
     OPLS_VERSION    ${Force_Field}
     USE_RANDOM_SEED YES
@@ -2835,10 +2843,7 @@ cat<<MMGBSA_EN >> ${Inp_Name}
     STAGECLASS  prime.MMGBSAStage
     INPUTS  ${Ligand_name},
     OUTPUTS MMGBSA_EN_OUT
-    MAX_JOBS    ${Prime}
-    THREADS    ${Prime}
     OUTPUT_LIG_STRAING  True
-    OPLS_VERSION    ${Force_Field}
     USE_MAE_CHARGES True
 [USEROUTS:${task}]
     USEROUTS   MMGBSA_EN_OUT,
@@ -2862,11 +2867,9 @@ cat<<MMGBSA_MIN >> ${Inp_Name}
     INPUTS  ${Ligand_name},
     OUTPUTS MMGBSA_MIN_OUT
     PRIME_TYPE  REAL_MIN
-    MAX_JOBS    ${Prime}
-    THREADS    ${Prime}
-    OPLS_VERSION    ${Force_Field}
     USE_MAE_CHARGES True
     USE_RANDOM_SEED YES
+    LIGAND ligand
     FLEXDIST    5.0
     NUMBER_OF_PASSES    2
     MINIM_NITER 2
@@ -2878,10 +2881,7 @@ cat<<MMGBSA_MIN >> ${Inp_Name}
     STAGECLASS  prime.MMGBSAStage
     INPUTS  MMGBSA_MIN_OUT,
     OUTPUTS MMGBSA_EN_OUT
-    MAX_JOBS    ${Prime}
-    THREADS    ${Prime}
     OUTPUT_LIG_STRAING  True
-    OPLS_VERSION    ${Force_Field}
     USE_MAE_CHARGES True
 [USEROUTS:${task}]
     USEROUTS   MMGBSA_MIN_OUT,
@@ -2905,9 +2905,7 @@ cat<<MMGBSA_OPT >> ${Inp_Name}
     INPUTS  ${Ligand_name},
     OUTPUTS MMGBSA_OPT_OUT
     PRIME_TYPE  SIDE_PRED
-    MAX_JOBS    ${Prime}
-    THREADS    ${Prime}
-    OPLS_VERSION    ${Force_Field}
+    LIGAND ligand
     USE_MAE_CHARGES True
     USE_RANDOM_SEED YES
     FLEXDIST    5.0
@@ -2920,11 +2918,8 @@ cat<<MMGBSA_OPT >> ${Inp_Name}
     STAGECLASS  prime.MMGBSAStage
     INPUTS  MMGBSA_OPT_OUT,
     OUTPUTS MMGBSA_EN_OUT
-    MAX_JOBS    ${Prime}
-    THREADS    ${Prime}
     OUTPUT_LIG_STRAING  True
     USE_MAE_CHARGES True
-    OPLS_VERSION    ${Force_Field}
 [USEROUTS:${task}]
     USEROUTS   MMGBSA_MIN_OUT,
     STRUCTOUT   MMGBSA_MIN_OUT
@@ -3076,8 +3071,6 @@ CDD
 #     STAGECLASS  prime.PrimeStage
 #     INPUTS  COV_COMPLEX_OUT
 #     OUTPUTS COV_REFINE_OUT
-#     MAX_JOBS    ${Prime}
-#     THREADS    ${Prime}
 #     PRIME_TYPE  COVALENT_DOCKING
 #     OPLS_VERSION    ${Force_Field}
 #     USE_RANDOM_SEED YES
@@ -3101,8 +3094,6 @@ CDD
 #     STAGECLASS  prime.PrimeStage
 #     INPUTS  COV_COMPLEX_OUT
 #     OUTPUTS COV_REFINE_OUT
-#     MAX_JOBS    ${Prime}
-#     THREADS    ${Prime}
 #     PRIME_TYPE  COVALENT_DOCKING
 #     OPLS_VERSION    ${Force_Field}
 #     USE_RANDOM_SEED YES
@@ -3233,7 +3224,7 @@ do
     #############
     if [ $HOST == "localhost" ]; then
         #$SCHRODINGER/run pipeline_startup.py ${Inp_Name} -OVERWRITE -adjust -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -JOBNAME ${Job_Title} -host_glide "${HOST}:${Glide}" -host_ligprep "${HOST}:${LigPrep}" -host_phase "${HOST}:${Phase}" -host_prime "${HOST}:${Prime}" -host_mmod "${HOST}:${MACROMODEL}" -host_qsite "${HOST}:${Qsite}" -host_qikprop "${HOST}:${QIKPROP}" -TMPLAUNCHDIR -WAIT
-        $SCHRODINGER/pipeline -OVERWRITE -TMPLAUNCHDIR -adjust -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -JOBNAME ${Job_Title} -host_glide "${HOST}:${Glide}" -host_ligprep "${HOST}:${LigPrep}" -host_phase "${HOST}:${Phase}" -host_prime "${HOST}:${Prime}" -host_mmod "${HOST}:${MACROMODEL}" -host_qsite "${HOST}:${Qsite}" -host_qikprop "${HOST}:${QIKPROP}" -WAIT -no_cleanup ${Inp_Name}
+        $SCHRODINGER/pipeline -OVERWRITE -TMPLAUNCHDIR -adjust -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -JOBNAME ${Job_Title} -host_glide "${HOST}:${Glide}" -host_ligprep "${HOST}:${LigPrep}" -host_phase "${HOST}:${Phase}" -host_prime "${HOST}:${Prime}" -host_mmod "${HOST}:${MACROMODEL}" -host_qsite "${HOST}:${Qsite}" -host_qikprop "${HOST}:${QIKPROP}" -WAIT -NOJOBID -no_cleanup ${Inp_Name}
         #$SCHRODINGER/vsw -OVERWRITE -TMPLAUNCHDIR -adjust -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -JOBNAME ${Job_Title} -host_glide "${HOST}:${Glide}" -host_ligprep "${HOST}:${LigPrep}" -host_phase "${HOST}:${Phase}" -host_prime "${HOST}:${Prime}" -host_mmod "${HOST}:${MACROMODEL}" -host_qsite "${HOST}:${Qsite}" -host_qikprop "${HOST}:${QIKPROP}" -WAIT ${Inp_Name}
     else
         #$SCHRODINGER/run pipeline_startup.py ${Inp_Name} -OVERWRITE -adjust -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -JOBNAME ${Job_Title} -host_glide "${HOST}:${Glide}" -host_ligprep "${HOST}:${LigPrep}" -host_phase "${HOST}:${Phase}" -host_prime "${HOST}:${Prime}" -host_mmod "${HOST}:${MACROMODEL}" -host_qsite "${HOST}:${Qsite}" -host_qikprop "${HOST}:${QIKPROP}" -TMPLAUNCHDIR
