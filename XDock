@@ -1,6 +1,6 @@
 #!/bin/bash
 #########################################################################
-# XDock, Version 1.4.5
+# XDock, Version 1.4.6
 # 2021, ShanghaiTech University, Wang Lin
 # Email: wanglin3@shanghaitech.edu.cn
 #########################################################################
@@ -19,6 +19,7 @@
     # Job Control
     Mode="SITEMAP"
     ligand_asl="first ligand detected"
+    only_peptide_Segment=false   
 
     ligPrep="epik"
     ProPrep="rough"
@@ -305,6 +306,88 @@ if [ ${uniprot_list} ] && [ -f ${uniprot_list} ];then
     ProPrep="none"
 fi
 
+# Job control "Normal" "Grid" "COMPD" "COMPI" "SITEMAP" "GCD" "GCI"
+if [ $Mode == "AllSite" ];then
+    By_Center=false
+    By_Complex=true
+    By_SiteMap=true
+    ligand_asl="ligand"
+    Xglide=true
+    Docking=true
+    Induce_Fit=false
+elif [ $Mode == "SiteMapGrid" ];then
+    By_Center=false
+    By_Complex=false
+    By_SiteMap=true
+    Xglide=true
+    Docking=false
+    Induce_Fit=false
+elif [ $Mode == "ComplexGrid" ];then
+    By_Center=false
+    By_Complex=true
+    By_SiteMap=false
+    Xglide=true
+    Docking=false
+    Induce_Fit=false
+elif [ $Mode == "CenterGrid" ];then
+    By_Center=true
+    By_Complex=false
+    By_SiteMap=false
+    Xglide=true
+    Docking=false
+    Induce_Fit=false
+elif [ $Mode == "Dock" ];then
+    By_Center=false
+    By_Complex=false
+    By_SiteMap=false
+    Grid_in=true
+    Xglide=true
+    Docking=true
+    Induce_Fit=false
+elif [ $Mode == "COMPD" ];then
+    By_Center=false
+    By_Complex=true
+    By_SiteMap=false
+    Xglide=true
+    Docking=true
+    Induce_Fit=false
+elif [ $Mode == "COMPI" ];then
+    By_Center=false
+    By_Complex=true
+    By_SiteMap=false
+    Xglide=false
+    Docking=false
+    Induce_Fit=true
+elif [ $Mode == "SITEMAP" ];then
+    By_Center=false
+    By_Complex=false
+    By_SiteMap=true
+    Xglide=true
+    Docking=true
+    Induce_Fit=false
+elif [ $Mode == "GCD" ];then
+    By_Center=true
+    By_Complex=false
+    By_SiteMap=false
+    Xglide=true
+    Docking=true
+    Induce_Fit=false
+elif [ $Mode == "GCI" ];then
+    By_Center=true
+    By_Complex=false
+    By_SiteMap=false
+    Xglide=false
+    Docking=false
+    Induce_Fit=true
+elif [ $Mode == "Native" ];then
+    Native=true
+    Xglide=false
+    Induce_Fit=false
+else
+    echo "Unkown Mode, Please contact wanglin3@shanghaitech.edu.cn."
+    exit
+fi
+
 cat<<OUTPUTLOG
 XDock Workflow Parameter:
 
@@ -483,94 +566,12 @@ else
     exit
 fi
 
-# Job control "Normal" "Grid" "COMPD" "COMPI" "SITEMAP" "GCD" "GCI"
-if [ $Mode == "AllSite" ];then
-    By_Center=false
-    By_Complex=true
-    By_SiteMap=true
-    ligand_asl="ligand"
-    Xglide=true
-    Docking=true
-    Induce_Fit=false
-elif [ $Mode == "SiteMapGrid" ];then
-    By_Center=false
-    By_Complex=false
-    By_SiteMap=true
-    Xglide=true
-    Docking=false
-    Induce_Fit=false
-elif [ $Mode == "ComplexGrid" ];then
-    By_Center=false
-    By_Complex=true
-    By_SiteMap=false
-    Xglide=true
-    Docking=false
-    Induce_Fit=false
-elif [ $Mode == "CenterGrid" ];then
-    By_Center=true
-    By_Complex=false
-    By_SiteMap=false
-    Xglide=true
-    Docking=false
-    Induce_Fit=false
-elif [ $Mode == "Dock" ];then
-    By_Center=false
-    By_Complex=false
-    By_SiteMap=false
-    Grid_in=true
-    Xglide=true
-    Docking=true
-    Induce_Fit=false
-elif [ $Mode == "COMPD" ];then
-    By_Center=false
-    By_Complex=true
-    By_SiteMap=false
-    Xglide=true
-    Docking=true
-    Induce_Fit=false
-elif [ $Mode == "COMPI" ];then
-    By_Center=false
-    By_Complex=true
-    By_SiteMap=false
-    Xglide=false
-    Docking=false
-    Induce_Fit=true
-elif [ $Mode == "SITEMAP" ];then
-    By_Center=false
-    By_Complex=false
-    By_SiteMap=true
-    Xglide=true
-    Docking=true
-    Induce_Fit=false
-elif [ $Mode == "GCD" ];then
-    By_Center=true
-    By_Complex=false
-    By_SiteMap=false
-    Xglide=true
-    Docking=true
-    Induce_Fit=false
-elif [ $Mode == "GCI" ];then
-    By_Center=true
-    By_Complex=false
-    By_SiteMap=false
-    Xglide=false
-    Docking=false
-    Induce_Fit=true
-elif [ $Mode == "Native" ];then
-    Native=true
-    Xglide=false
-    Induce_Fit=false
-else
-    echo "Unkown Mode, Please contact wanglin3@shanghaitech.edu.cn."
-    exit
-fi
-
-mkdir -p ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input})
 Job_Dir=${PWD}
-cd ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input})
 if [ ! ${Job_Title} ];then
-    Job_Title=${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input})-XDOCK
+    Job_Title=${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input%%.*})-XDOCK
 fi
+mkdir -p ${Job_Title}
+cd ${Job_Title}
 
 # Xglide Module
 if [ $Xglide == "true" ];then
@@ -656,7 +657,8 @@ DOCK_EPIK_PENALTIES   True
 DOCK_HBOND_ACCEP_HALO    True
 INP2
 elif [ $Docking == "peptide" ];then
-echo "DOCK_PEPTIDE    ${Peptide_docking}
+echo "LIGPREP_STEREO_SOURCE  geometry
+DOCK_PEPTIDE    ${Peptide_docking}
 DOCK_DOCKING_METHOD ${DOCKING_METHOD}
 DOCK_PRECISION      ${PRECISION}
 DOCK_LIG_VSCALE     ${scalingVdW}
@@ -689,7 +691,7 @@ else
     ${SCHRODINGER}/run xglide.py -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -verbose -DRIVERHOST "${HOST}"  -TMPLAUNCHDIR -OVERWRITE ${Job_Title}.inp  
 fi 
 
-fi && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!" 
+fi && echo "Job ${Job_Title} has been submitted!" 
 # Xglide Module
 
 # Native Dock
@@ -707,6 +709,7 @@ GRIDGEN_GRID_CENTER  SELF
 NATIVEONLY           TRUE
 DOCK_POSES_PER_LIG      ${Pose_Num}
 DOCK_NENHANCED_SAMPLING ${SAMPLING}
+DOCK_DOCKING_METHOD     ${DOCKING_METHOD}
 DOCK_POSE_OUTTYPE       poseviewer
 INP0
 
@@ -718,7 +721,7 @@ else
     ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -verbose -DRIVERHOST "${HOST}" -TMPLAUNCHDIR -OVERWRITE ${Job_Title}.inp  
 fi
 
-fi && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!" 
+fi && echo "Job ${Job_Title} has been submitted!" 
 # Native redock
 
 # Induce Fit Module
@@ -811,7 +814,7 @@ else
     ${SCHRODINGER}/ifd -NGLIDECPU ${Njobs} -NPRIMECPU ${Prime}  ${Job_Title}.inp -NOLOCAL -HOST ${HOST} -SUBHOST ${HOST} -TMPLAUNCHDIR -OVERWRITE ${Job_Title}.inp 
 fi
 
-fi && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!" 
+fi && echo "Job ${Job_Title} has been submitted!" 
 # Induce Fit Module
 
 cd ..
