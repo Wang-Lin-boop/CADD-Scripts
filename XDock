@@ -691,7 +691,7 @@ else
     ${SCHRODINGER}/run xglide.py -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -verbose -DRIVERHOST "${HOST}"  -TMPLAUNCHDIR -OVERWRITE ${Job_Title}.inp  
 fi 
 
-fi && echo "Job ${Job_Title} has been submitted!" 
+fi
 # Xglide Module
 
 # Native Dock
@@ -721,7 +721,7 @@ else
     ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -verbose -DRIVERHOST "${HOST}" -TMPLAUNCHDIR -OVERWRITE ${Job_Title}.inp  
 fi
 
-fi && echo "Job ${Job_Title} has been submitted!" 
+fi
 # Native redock
 
 # Induce Fit Module
@@ -813,9 +813,7 @@ if [ $HOST == "localhost" ]; then
 else
     ${SCHRODINGER}/ifd -NGLIDECPU ${Njobs} -NPRIMECPU ${Prime}  ${Job_Title}.inp -NOLOCAL -HOST ${HOST} -SUBHOST ${HOST} -TMPLAUNCHDIR -OVERWRITE ${Job_Title}.inp 
 fi
-
-fi && echo "Job ${Job_Title} has been submitted!" 
-# Induce Fit Module
+fi
 
 cd ..
 exit
