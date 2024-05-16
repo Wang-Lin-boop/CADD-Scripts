@@ -38,6 +38,9 @@ Usage: proteinMC -i <structure>.mae -s 100 -r -H <CPU> -N 30
 Required Options:
     -i      Input sturctural file in *.mae or dir for *.pdb, required.
     -t      Job type for Monte Carlo simulation: <${Job_Type}>
+            Protein Prepare:
+                Normal, protein prepare for normal tissue and sub-celluar location.
+                Lysozyme, protein prepare for lysozyme.
             Prime Global Refinement:
                 MC, hybird MC; 
                 SIDE_PRED, sidechain refine with backbone sampling.
@@ -139,7 +142,13 @@ elif [ -d ${input_file} ];then
     $SCHRODINGER/utilities/structcat -ipdb ${input_file}/*.pdb -omae ${job_name}_in.mae
     export input_file=`readlink -f ${job_name}_in.mae`
 fi
-if [ ${Job_Type} == "PPI_MMGBSA" ];then
+if [ ${Job_Type} == "Normal" ];then
+    echo "Protein Prepare....."
+    ${SCHRODINGER}/utilities/prepwizard -fillsidechains -disulfides -rehtreat -epik_pH 6.9 -epik_pHt 0.6 -samplewater -propka_pH 6.9 -f S-OPLS -rmsd 0.3 -WAIT -HOST ${CPU_HOST} -NJOBS ${NJOBS} -keepfarwat -glycosylation -delwater_hbond_cutoff 3 ${input_file} ${job_name}-prep.mae
+elif [ ${Job_Type} == "Lysozyme" ];then
+    echo "Protein Prepare....."
+    ${SCHRODINGER}/utilities/prepwizard -fillsidechains -disulfides -rehtreat -epik_pH 4.75 -epik_pHt 0.75 -samplewater -propka_pH 4.75 -f S-OPLS -rmsd 0.3 -WAIT -HOST ${CPU_HOST} -NJOBS ${NJOBS} -keepfarwat -glycosylation -delwater_hbond_cutoff 3 ${input_file} ${job_name}-prep.mae
+elif [ ${Job_Type} == "PPI_MMGBSA" ];then
     echo "
 Set up a MM-GBSA calculation:
 Use_membrane: ${use_membrane}
@@ -326,7 +335,13 @@ EOF
     qsub ${job_name}.pbs
 }
 
-if [ ${Job_Type} == "MC" ]; then
+if [ ${Job_Type} == "Normal" ]; then
+    Job_Type="Normal"
+    PrimeMC
+elif [ ${Job_Type} == "Lysozyme" ]; then
+    Job_Type="Lysozyme"
+    PrimeMC
+elif [ ${Job_Type} == "MC" ]; then
     Job_Type="MC"
     PrimeMC
 elif [ ${Job_Type} == "PPI_MMGBSA" ]; then
