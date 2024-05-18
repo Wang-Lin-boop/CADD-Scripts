@@ -370,7 +370,7 @@ fi
 echo "Submitting Flexible Docking Jobs......"
 echo ""
 
-${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -TMPLAUNCHDIR -OVERWRITE Xglide-${Mode}.inp  && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!"
+${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -TMPLAUNCHDIR Xglide-${Mode}.inp  && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!"
 
 fi # Xglide Module
 
@@ -477,7 +477,7 @@ INP0
 echo "Submitting Native re-docking Jobs......"
 echo ""
 
-${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -TMPLAUNCHDIR -OVERWRITE Redock-${Mode}.inp  && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!"
+${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -TMPLAUNCHDIR Redock-${Mode}.inp  && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!"
 
 fi # Native redock
 cd ..
