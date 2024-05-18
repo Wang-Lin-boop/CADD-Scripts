@@ -144,10 +144,10 @@ elif [ -d ${input_file} ];then
 fi
 if [ ${Job_Type} == "Normal" ];then
     echo "Protein Prepare....."
-    ${SCHRODINGER}/utilities/prepwizard -fillsidechains -disulfides -rehtreat -epik_pH 6.9 -epik_pHt 0.6 -samplewater -propka_pH 6.9 -f S-OPLS -rmsd 0.3 -WAIT -keepfarwat -glycosylation -delwater_hbond_cutoff 3 ${input_file} ${job_name}-prep.mae
+    ${SCHRODINGER}/utilities/prepwizard -fillsidechains -disulfides -rehtreat -epik_pH 6.9 -epik_pHt 0.6 -samplewater -propka_pH 6.9 -f S-OPLS -rmsd 0.3 -WAIT -keepfarwat -glycosylation -delwater_hbond_cutoff 3 ${input_file} ${job_name}-prep.maegz
 elif [ ${Job_Type} == "Lysozyme" ];then
     echo "Protein Prepare....."
-    ${SCHRODINGER}/utilities/prepwizard -fillsidechains -disulfides -rehtreat -epik_pH 4.75 -epik_pHt 0.75 -samplewater -propka_pH 4.75 -f S-OPLS -rmsd 0.3 -WAIT  -keepfarwat -glycosylation -delwater_hbond_cutoff 3 ${input_file} ${job_name}-prep.mae
+    ${SCHRODINGER}/utilities/prepwizard -fillsidechains -disulfides -rehtreat -epik_pH 4.75 -epik_pHt 0.75 -samplewater -propka_pH 4.75 -f S-OPLS -rmsd 0.3 -WAIT  -keepfarwat -glycosylation -delwater_hbond_cutoff 3 ${input_file} ${job_name}-prep.maegz
 elif [ ${Job_Type} == "PPI_MMGBSA" ];then
     echo "
 Set up a MM-GBSA calculation:
