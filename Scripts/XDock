@@ -43,7 +43,7 @@
     rosetta_db=${rosetta_db}
 
 help(){
-cat<<HELP
+cat << HELP
 
 Perform Virtual Screening Workflow.
 
@@ -370,7 +370,11 @@ fi
 echo "Submitting Flexible Docking Jobs......"
 echo ""
 
-${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -TMPLAUNCHDIR Xglide-${Mode}.inp  && echo "Job ${Mode}-$(basename ${Protein_Input})-$(basename ${Ligand_Input}) has been submitted!"
+if [ ${HOST} == "localhost" ];then
+    ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -WAIT -TMPLAUNCHDIR Xglide-${Mode}.inp
+else
+    ${SCHRODINGER}/run xglide.py -OVERWRITE -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -DRIVERHOST "${HOST}" -TMPLAUNCHDIR Xglide-${Mode}.inp
+done
 
 fi # Xglide Module
 
