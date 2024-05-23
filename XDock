@@ -686,7 +686,7 @@ echo "Submitting Flexible Docking Jobs......"
 echo ""
 check_inp ${Job_Title}.inp  
 if [ $HOST == "localhost" ]; then
-    ${SCHRODINGER}/run xglide.py -NJOBS ${Njobs} -HOST "localhost:${Njobs}" -WAIT -verbose -TMPLAUNCHDIR -OVERWRITE ${Job_Title}.inp  
+    ${SCHRODINGER}/run xglide.py -NJOBS ${Njobs} -HOST "localhost:${Njobs}" -WAIT -NOJOBID -DRIVERHOST localhost -verbose -TMPLAUNCHDIR -OVERWRITE ${Job_Title}.inp  
 else
     ${SCHRODINGER}/run xglide.py -NJOBS ${Njobs} -HOST "${HOST}:${Njobs}" -verbose -DRIVERHOST "${HOST}"  -TMPLAUNCHDIR -OVERWRITE ${Job_Title}.inp  
 fi 
