@@ -133,6 +133,11 @@ done
 
 function PrimeMC(){
 job_name="$(basename ${input_file%%.*})_${Job_Type}"
+if [ ${CPU_HOST} == "localhost" ] || [ ${CPU_HOST} == "local" ];then
+    waitcmd="-WAIT"
+else
+    waitcmd=""
+fi
 if [ ${input_file##*.} == "mae" ] || [ ${input_file##*.} == "maegz" ];then
     echo ""
 elif [ ${input_file##*.} == "pdb" ];then
@@ -155,9 +160,9 @@ Use_membrane: ${use_membrane}
 "
     ${SCHRODINGER}/utilities/prepwizard -fillsidechains -disulfides -rehtreat -epik_pH 7.0 -epik_pHt 0.6 -samplewater -propka_pH 7.0 -f S-OPLS -rmsd 0.3 -WAIT  -keepfarwat -glycosylation -delwater_hbond_cutoff 3 ${input_file} ${job_name}-reprep.mae
     if [ ${use_membrane} == "yes" ];then
-        ${SCHRODINGER}/prime_mmgbsa -job_type REAL_MIN -rflexdist 5 -jobname "${job_name}-MMGBSA" -ligand "chain.name ${comp2}" -membrane -HOST "${CPU_HOST}:${NJOBS}" -NJOBS ${NJOBS} ${job_name}-reprep.mae
+        ${SCHRODINGER}/prime_mmgbsa -job_type REAL_MIN -rflexdist 5 -jobname "${job_name}-MMGBSA" -ligand "chain.name ${comp2}" -membrane -HOST "${CPU_HOST}:${NJOBS}" -NJOBS ${NJOBS} ${waitcmd} ${job_name}-reprep.mae
     else
-        ${SCHRODINGER}/prime_mmgbsa -job_type REAL_MIN -rflexdist 5 -jobname "${job_name}-MMGBSA" -ligand "chain.name ${comp2}" -HOST "${CPU_HOST}:${NJOBS}" -NJOBS ${NJOBS} ${job_name}-reprep.mae
+        ${SCHRODINGER}/prime_mmgbsa -job_type REAL_MIN -rflexdist 5 -jobname "${job_name}-MMGBSA" -ligand "chain.name ${comp2}" -HOST "${CPU_HOST}:${NJOBS}" -NJOBS ${NJOBS} ${waitcmd} ${job_name}-reprep.mae
     fi
 else
 echo "
@@ -208,7 +213,7 @@ EOF
     if [ ${constraints} == true ];then
         echo "CONSTRAINT_0 asl=${constraints_asls};${constraints_force};${constraints_tolerance}" >> ${job_name}.inp
     fi
-    ${SCHRODINGER}/prime -HOST "${CPU_HOST}:${NJOBS}" -NJOBS ${NJOBS} ${job_name}.inp
+    ${SCHRODINGER}/prime -HOST "${CPU_HOST}:${NJOBS}" -NJOBS ${NJOBS} ${waitcmd} ${job_name}.inp
 fi
 }
 
