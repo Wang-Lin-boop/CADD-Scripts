@@ -59,8 +59,8 @@ Environment Options (MC, SIDE_PRED, SIDE_OPT, and PPI_MMGBSA):
     -m      Use this option to consider the membrane in the simulation, 
             which requires setting the membrane position in GUI.
 PPI Refinement Options (PPI_MMGBSA, FlexPepDock, FlexPepRefine, PPI_Dock and PPI_Refine):
-    -1      The chain name for component 1 (receptor chain). <${comp1}>
-    -2      The chain name for component 2 (ligand chain or peptide). <${comp2}>
+    -1      The asl (for prime) or chain name (for rosetta) of component 1 (receptor). <${comp1}>
+    -2      The asl (for prime) or chain name (for rosetta) of component 2 (ligand or peptide). <${comp2}>
 Prime Global Refinement Options (MC, SIDE_PRED, and SIDE_OPT):
     -R      ASL for refine range. <${Range}>
     -s      Steps of MC simulations. <${MC_Steps}>
@@ -160,9 +160,9 @@ Use_membrane: ${use_membrane}
 "
     ${SCHRODINGER}/utilities/prepwizard -fillsidechains -disulfides -rehtreat -epik_pH 7.0 -epik_pHt 0.6 -samplewater -propka_pH 7.0 -f S-OPLS -rmsd 0.3 -WAIT  -keepfarwat -glycosylation -delwater_hbond_cutoff 3 ${input_file} ${job_name}-reprep.mae
     if [ ${use_membrane} == "yes" ];then
-        ${SCHRODINGER}/prime_mmgbsa -job_type REAL_MIN -rflexdist 5 -jobname "${job_name}-MMGBSA" -ligand "chain.name ${comp2}" -membrane -HOST "${CPU_HOST}:${NJOBS}" -NJOBS ${NJOBS} ${waitcmd} ${job_name}-reprep.mae
+        ${SCHRODINGER}/prime_mmgbsa -job_type REAL_MIN -rflexdist 5 -jobname "${job_name}-MMGBSA" -ligand "${comp2}" -membrane -HOST "${CPU_HOST}:${NJOBS}" -NJOBS ${NJOBS} ${waitcmd} ${job_name}-reprep.mae
     else
-        ${SCHRODINGER}/prime_mmgbsa -job_type REAL_MIN -rflexdist 5 -jobname "${job_name}-MMGBSA" -ligand "chain.name ${comp2}" -HOST "${CPU_HOST}:${NJOBS}" -NJOBS ${NJOBS} ${waitcmd} ${job_name}-reprep.mae
+        ${SCHRODINGER}/prime_mmgbsa -job_type REAL_MIN -rflexdist 5 -jobname "${job_name}-MMGBSA" -ligand "${comp2}" -HOST "${CPU_HOST}:${NJOBS}" -NJOBS ${NJOBS} ${waitcmd} ${job_name}-reprep.mae
     fi
 else
 echo "
