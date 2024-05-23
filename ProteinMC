@@ -159,9 +159,9 @@ Set up a MM-GBSA calculation:
 Use_membrane: ${use_membrane}
 "
     if [ ${use_membrane} == "yes" ];then
-        ${SCHRODINGER}/prime_mmgbsa -job_type REAL_MIN -rflexdist 5 -jobname "${job_name}-MMGBSA" -ligand "${comp2}" -membrane -HOST "${CPU_HOST}:${NJOBS}" -NJOBS ${NJOBS} ${waitcmd} ${job_name}-reprep.mae
+        ${SCHRODINGER}/prime_mmgbsa -job_type REAL_MIN -rflexdist 5 -jobname "${job_name}-MMGBSA" -ligand "${comp2}" -membrane -HOST "${CPU_HOST}:${NJOBS}" -NJOBS ${NJOBS} ${waitcmd} ${input_file}
     else
-        ${SCHRODINGER}/prime_mmgbsa -job_type REAL_MIN -rflexdist 5 -jobname "${job_name}-MMGBSA" -ligand "${comp2}" -HOST "${CPU_HOST}:${NJOBS}" -NJOBS ${NJOBS} ${waitcmd} ${job_name}-reprep.mae
+        ${SCHRODINGER}/prime_mmgbsa -job_type REAL_MIN -rflexdist 5 -jobname "${job_name}-MMGBSA" -ligand "${comp2}" -HOST "${CPU_HOST}:${NJOBS}" -NJOBS ${NJOBS} ${waitcmd} ${input_file}
     fi
 else
 echo "
