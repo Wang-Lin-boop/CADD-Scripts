@@ -47,7 +47,7 @@
     Distance=5.0
     SAMPLING=1
     MAXKEEP=5000
-    scalingVdW=0.9
+    scalingVdW=0.8
     scalingVdW_rec=0.9
 
     box_inner=12
