@@ -48,6 +48,7 @@
     SAMPLING=1
     MAXKEEP=5000
     scalingVdW=0.9
+    scalingVdW_rec=0.9
 
     box_inner=12
     Box_Buffer=5
@@ -133,7 +134,8 @@ XDock control parameter:
                 Define pocket by Provided Grid center Coordinate, e.g. -g "153.00, 65.023, 24.003".
   -a    Ligand ASL for COMPD or ComplexGrid Mode, default is the first ligand detected. <$ligand_asl>
 
-  -v    scalingVdW, reducing this value and collocating with MMGBSA refine to induce receptor fit ligands. 0.5 is OK. <${scalingVdW}>
+  -v    scalingVdW for ligand, used in conjunction with prime MMGBSA to induce fit refinement. 0.75 is OK. <${scalingVdW}>
+  -V    scalingVdW for receptor. <${scalingVdW_rec}>
   -g    Only the grid center Coordinate will be considered.
             Define a grid center Coordinate to docking, additionally. Such as "153.00, 65.023, 24.003".
   -s    The number of Grid files per protein generated using Sitemap. <2>
@@ -159,7 +161,7 @@ Job control:
   -S	Your Schrodinger path. <$SCHRODINGER>
   -R    Your Rosetta path, Must be mpi version. <$rosetta_app>
   -B    Your Rosetta Database. <$rosetta_db>
-  -V    Rosetta version, static or mpi. <mpi>
+  -M    Rosetta version, static or mpi. <mpi>
 
 Thank you for your using, If you found any problem, please contact wanglin3@shanghaitech.edu.cn.
 HELP
@@ -174,7 +176,7 @@ check_inp(){
     fi
 }
 
-while getopts ":hP:L:l:p:H:N:S:g:s:m:a:n:o:x:A:F:D:r:R:B:ewv:tV:d:b:i:T:f:10u:U:" opt
+while getopts ":hP:L:l:p:H:N:S:g:s:m:a:n:o:x:A:F:D:r:R:B:ewv:tV:d:b:i:T:f:10u:U:M:" opt
 do
   case $opt in
     h)
@@ -190,7 +192,7 @@ do
         rosetta_app=$OPTARG;;
     B)
         rosetta_db=$OPTARG;;
-    V)
+    M)
         rosetta_version=$OPTARG;;
     P)
         Protein_Input=`readlink -f $OPTARG`;;
@@ -222,6 +224,8 @@ do
         ligand_asl=$OPTARG;;
     v)
         scalingVdW=$OPTARG;;
+    V)
+        scalingVdW_rec=$OPTARG;;
     i)
         box_inner=$OPTARG;;
     b)
@@ -626,7 +630,7 @@ PPREP_IMPREF_RMSD   ${PPREP_IMPREF_RMSD}
 PPREP_WATERDIST     ${PPREP_WATERDIST}
 GRIDGEN_INNERBOX        ${box_inner}
 GRIDGEN_OUTERBOX_BUFFER     ${Box_Buffer}
-GRIDGEN_RECEP_VSCALE    ${scalingVdW}
+GRIDGEN_RECEP_VSCALE    ${scalingVdW_rec}
 GRIDGEN_PEPTIDE     ${GRIDGEN_PEPTIDE}
 GRIDGEN_FORCEFIELD      ${Force_Field}
 GRIDGEN_OUTPUTDIR    .
