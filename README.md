@@ -64,6 +64,6 @@ For example,  `export SCHRODINGER=/public/home/wanglin3/software/SCHRODINGER`
 
 How to cite
 ----
-It is recommended that citing the script by a link (such as: `GVSrun(https://github.com/Wang-Lin-boop/Schrodinger-Script)`) or refer to this page [Ways to cite a GitHub Repo](https://www.wikihow.com/Cite-a-GitHub-Repository) to promote reproducibility of your work.
+It is recommended that citing the script by a link (such as: `GVSrun(https://github.com/Wang-Lin-boop/CADD-Scripts)`) or refer to this page [Ways to cite a GitHub Repo](https://www.wikihow.com/Cite-a-GitHub-Repository) to promote reproducibility of your work.
 
 后排插播一条广告，欢迎加入Schrödinger中文社区，请致信wanglin3@shanghaitech.edu.cn获取加群二维码。
