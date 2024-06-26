@@ -52,9 +52,9 @@ Environment Variables
 ----
 These environmental variables are necessary: 
 
-1:`SCHRODINGER` (installation path of Schrodinger) is necessary for `GVSrun`, and `XDock`;
+1:`SCHRODINGER` (installation path of Schrodinger) is required for `GVSrun`, and `XDock`;
 
-2:`compound_library` (compound library for your compound databases) is necessary for `GVSrun`;
+2:`compound_library` (compound library for your compound databases) is required for `GVSrun`;
 
 3:`rosetta_app` or `rosetta_db` (installation path of rosetta) is optional for `XDock`;
 
