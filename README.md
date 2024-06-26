@@ -3,6 +3,21 @@ Scripts to run Schrödinger and Rosetta jobs.
 
 [![DOI](https://zenodo.org/badge/365661221.svg)](https://zenodo.org/badge/latestdoi/365661221)
 
+Installation
+----
+
+Download CADD-Scripts and set the environment variable.
+
+```
+git clone https://github.com/Wang-Lin-boop/CADD-Scripts
+cd CADD-Scripts
+echo "export PATH=${PWD}:\${PATH}" >> ~/.bashrc
+chmod +x XDock
+chmod +x GVSrun
+chmod +x ProteinMC
+source ~/.bashrc
+```
+
 
 Scripts
 ----
