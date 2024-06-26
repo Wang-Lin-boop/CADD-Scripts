@@ -17,7 +17,10 @@ Using -h option to show help information for this scripts, such as `GVSrun -h`.
    ProteinMC: Protein Relax, Protein-Protein Docking, MM-GBSA Calculation. 
 ```
 
-GVSrun and plmd is higher recommoned than Vsgo and DSMDrun.
+Related-Script
+----
+
+Refer to [AutoMD](https://github.com/Wang-Lin-boop/AutoMD) for automated execution of molecular dynamics simulations and trajectory analysis.
 
 Chinese documents
 ----
