@@ -1,5 +1,5 @@
-# Schrodinger-Script
-Scripts to run Schrödinger jobs.
+# CADD-Scripts (using Schrödinger and Rosetta)
+Scripts to run Schrödinger and Rosetta jobs.
 
 [![DOI](https://zenodo.org/badge/365661221.svg)](https://zenodo.org/badge/latestdoi/365661221)
 
