@@ -48,7 +48,7 @@
     SAMPLING=1
     MAXKEEP=5000
     scalingVdW=0.8
-    scalingVdW_rec=0.9
+    scalingVdW_rec=1.0
 
     box_inner=12
     Box_Buffer=5
