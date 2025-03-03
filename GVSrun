@@ -1525,8 +1525,10 @@ cat<<SP >> ${Inp_Name}
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
-    GENCODES   NO
-    UNIQUEFIELD   s_vsw_compound_code
+    GENCODES   YES
+    OUTCOMPOUNDFIELD   s_vsw_compound_code
+    OUTVARIANTFIELD   s_vsw_variant
+    UNIQUEFIELD   NONE
 [STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
     INPUTS   DOCK_${task}_INPUT, GRID
@@ -1571,8 +1573,10 @@ cat<<SP >> ${Inp_Name}
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
-    GENCODES   NO
-    UNIQUEFIELD   s_vsw_compound_code
+    GENCODES   YES
+    OUTCOMPOUNDFIELD   s_vsw_compound_code
+    OUTVARIANTFIELD   s_vsw_variant
+    UNIQUEFIELD   NONE
 [STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
     INPUTS   DOCK_${task}_INPUT, GRID
@@ -1619,8 +1623,10 @@ cat<<SP >> ${Inp_Name}
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
-    GENCODES   NO
-    UNIQUEFIELD   s_vsw_compound_code
+    GENCODES   YES
+    OUTCOMPOUNDFIELD   s_vsw_compound_code
+    OUTVARIANTFIELD   s_vsw_variant
+    UNIQUEFIELD   NONE
 [STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
     INPUTS   DOCK_${task}_INPUT, GRID
@@ -1669,8 +1675,10 @@ cat<<SP >> ${Inp_Name}
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
-    GENCODES   NO
-    UNIQUEFIELD   s_vsw_compound_code
+    GENCODES   YES
+    OUTCOMPOUNDFIELD   s_vsw_compound_code
+    OUTVARIANTFIELD   s_vsw_variant
+    UNIQUEFIELD   NONE
 [STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
     INPUTS   DOCK_${task}_INPUT, GRID
@@ -1727,8 +1735,10 @@ cat<<SP >> ${Inp_Name}
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
-    GENCODES   NO
-    UNIQUEFIELD   s_vsw_compound_code
+    GENCODES   YES
+    OUTCOMPOUNDFIELD   s_vsw_compound_code
+    OUTVARIANTFIELD   s_vsw_variant
+    UNIQUEFIELD   NONE
 [STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
     INPUTS   DOCK_${task}_INPUT, GRID
@@ -1779,8 +1789,10 @@ cat<<SP >> ${Inp_Name}
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
-    GENCODES   NO
-    UNIQUEFIELD   s_vsw_compound_code
+    GENCODES   YES
+    OUTCOMPOUNDFIELD   s_vsw_compound_code
+    OUTVARIANTFIELD   s_vsw_variant
+    UNIQUEFIELD   NONE
 [STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
     INPUTS   DOCK_${task}_INPUT, GRID
@@ -1831,8 +1843,10 @@ cat<<SP >> ${Inp_Name}
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
-    GENCODES   NO
-    UNIQUEFIELD   s_vsw_compound_code
+    GENCODES   YES
+    OUTCOMPOUNDFIELD   s_vsw_compound_code
+    OUTVARIANTFIELD   s_vsw_variant
+    UNIQUEFIELD   NONE
 [STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
     INPUTS   DOCK_${task}_INPUT, GRID
@@ -1882,8 +1896,10 @@ cat<<SP >> ${Inp_Name}
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
-    GENCODES   NO
-    UNIQUEFIELD   s_vsw_compound_code
+    GENCODES   YES
+    OUTCOMPOUNDFIELD   s_vsw_compound_code
+    OUTVARIANTFIELD   s_vsw_variant
+    UNIQUEFIELD   NONE
 [STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
     INPUTS   DOCK_${task}_INPUT, GRID
@@ -1930,8 +1946,10 @@ cat<<XP >> ${Inp_Name}
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
-    GENCODES   NO
-    UNIQUEFIELD   s_vsw_compound_code
+    GENCODES   YES
+    OUTCOMPOUNDFIELD   s_vsw_compound_code
+    OUTVARIANTFIELD   s_vsw_variant
+    UNIQUEFIELD   NONE
 [STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
     INPUTS   DOCK_${task}_INPUT, GRID
@@ -1977,8 +1995,10 @@ cat<<XP >> ${Inp_Name}
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
-    GENCODES   NO
-    UNIQUEFIELD   s_vsw_compound_code
+    GENCODES   YES
+    OUTCOMPOUNDFIELD   s_vsw_compound_code
+    OUTVARIANTFIELD   s_vsw_variant
+    UNIQUEFIELD   NONE
 [STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
     INPUTS   DOCK_${task}_INPUT, GRID
@@ -2027,8 +2047,10 @@ cat<<XP >> ${Inp_Name}
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
-    GENCODES   NO
-    UNIQUEFIELD   s_vsw_compound_code
+    GENCODES   YES
+    OUTCOMPOUNDFIELD   s_vsw_compound_code
+    OUTVARIANTFIELD   s_vsw_variant
+    UNIQUEFIELD   NONE
 [STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
     INPUTS   DOCK_${task}_INPUT, GRID
@@ -2079,8 +2101,10 @@ cat<<XP >> ${Inp_Name}
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
-    GENCODES   NO
-    UNIQUEFIELD   s_vsw_compound_code
+    GENCODES   YES
+    OUTCOMPOUNDFIELD   s_vsw_compound_code
+    OUTVARIANTFIELD   s_vsw_variant
+    UNIQUEFIELD   NONE
 [STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
     INPUTS   DOCK_${task}_INPUT, GRID
@@ -2135,8 +2159,10 @@ cat<<XP >> ${Inp_Name}
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
-    GENCODES   NO
-    UNIQUEFIELD   s_vsw_compound_code
+    GENCODES   YES
+    OUTCOMPOUNDFIELD   s_vsw_compound_code
+    OUTVARIANTFIELD   s_vsw_variant
+    UNIQUEFIELD   NONE
 [STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
     INPUTS   DOCK_${task}_INPUT, GRID
@@ -2186,8 +2212,10 @@ cat<<XP >> ${Inp_Name}
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
-    GENCODES   NO
-    UNIQUEFIELD   s_vsw_compound_code
+    GENCODES   YES
+    OUTCOMPOUNDFIELD   s_vsw_compound_code
+    OUTVARIANTFIELD   s_vsw_variant
+    UNIQUEFIELD   NONE
 [STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
     INPUTS   DOCK_${task}_INPUT, GRID
@@ -2236,8 +2264,10 @@ cat<<XP >> ${Inp_Name}
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
-    GENCODES   NO
-    UNIQUEFIELD   s_vsw_compound_code
+    GENCODES   YES
+    OUTCOMPOUNDFIELD   s_vsw_compound_code
+    OUTVARIANTFIELD   s_vsw_variant
+    UNIQUEFIELD   NONE
 [STAGE:DOCK_${task}]
     STAGECLASS   glide.DockingStage
     INPUTS   DOCK_${task}_INPUT, GRID
@@ -2727,8 +2757,10 @@ cat<<IFT >> ${Inp_Name}
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
-    GENCODES   NO
-    UNIQUEFIELD   s_vsw_compound_code
+    GENCODES   YES
+    OUTCOMPOUNDFIELD   s_vsw_compound_code
+    OUTVARIANTFIELD   s_vsw_variant
+    UNIQUEFIELD   NONE
 [STAGE:${task}_DOCK_SP]
     STAGECLASS   glide.DockingStage
     INPUTS   DOCK_SP_INPUT, GRID
@@ -2941,8 +2973,10 @@ cat<<QMMM >> ${Inp_Name}
     OUTFORMAT   maegz
     MIN_SUBJOB_STS   300
     MAX_SUBJOB_STS   5000
-    GENCODES   NO
-    UNIQUEFIELD   s_vsw_compound_code
+    GENCODES   YES
+    OUTCOMPOUNDFIELD   s_vsw_compound_code
+    OUTVARIANTFIELD   s_vsw_variant
+    UNIQUEFIELD   NONE
 [STAGE:${task}_DOCK_SP]
     STAGECLASS   glide.DockingStage
     INPUTS   DOCK_QMSP_INPUT, GRID
