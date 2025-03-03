@@ -72,7 +72,7 @@ These options are supported by this script.
         Normal: Filter The Drug-like compounds and dock screening.
             "RDL+HTVS_Normal+QIKPROP+R5R+SP_ExtensionA"
         Local: Local docking and screening were carried out using the input ligand structure.
-            "HTVS_local+SP_local+MMGBSA_OPT"
+            "SP_local+MMGBSA_OPT"
         Reference: Virtual Screening with reference ligand restrain.
             "HTVS_REF+SP_REF+QIKPROP+R5R"
         Prep_Normal: Virtual Screening for un-prepared compounds database.
@@ -88,9 +88,9 @@ These options are supported by this script.
         Advance: dock screening.
             "HTVS_Normal+SP_ExtensionA+SP_Enhanced"
         Shape_Screening: perform screening based on reference ligand shape.
-            "PhaseShape+HTVS_local+SP_local"
+            "PhaseShape+SP_local"
         LocalShape_Screening: perform screening based on reference ligand shape.
-            "localShape+HTVS_local+SP_local"
+            "localShape+SP_local"
         Advance_Shape_Screening: perform screening based on reference ligand shape.
             "HTVS_Shape+SP_Shape"
 
@@ -141,8 +141,6 @@ These options are supported by this script.
             HTVS_Rough: The reduced HTVS screening, The sample size is reduced to nearly half of the HTVS_Normal.
             HTVS_Fragment: It is suitable for rapid screening of compound fragments.
             HTVS_REF: The standard HTVS screening based on a template ligand, This will significantly increase the hit rate.
-            HTVS_local: Docking is performed using the initial coordinates of the ligand,
-                            which is usually used as a post-processing for pharmacophore screening.
             IFT_pre: Pre-screening for Induce fit docking, also useful for screening before Covalent Docking.
                         NOTE: Set RECEP_VSCALE to 0.50 in Grid Geneation is a good idea.
             HTVS_Shape: Docking with reference ligand shape. with -R and -E option.
@@ -365,15 +363,15 @@ Parse_Running_Mode(){
     elif [ $Running_Mode == "QM_Screening" ]; then
         Pipeline="RDL+HTVS_Normal+QIKPROP+R5R+SP_ExtensionA+QM_redock+RMSD"
     elif [ $Running_Mode == "Shape_Screening" ];then
-        Pipeline="localShape+HTVS_local+SP_local"
+        Pipeline="localShape+SP_local"
     elif [ $Running_Mode == "Local" ];then
-        Pipeline="HTVS_local+SP_local+MMGBSA_OPT"
+        Pipeline="SP_local+MMGBSA_OPT"
     elif [ $Running_Mode == "Advance" ];then
         Pipeline="HTVS_Normal+SP_ExtensionA+SP_Enhanced"
     elif [ $Running_Mode == "Advance_Shape_Screening" ];then
         Pipeline="HTVS_Shape+SP_Shape"
     elif [ $Running_Mode == "LocalShape_Screening" ];then
-        Pipeline="PhaseShape+HTVS_local+SP_local"
+        Pipeline="PhaseShape+SP_local"
     elif [ $Running_Mode == "GeminiMol_Advance" ];then
         Pipeline="No_Dup+RDL+EPIK4+HTVS_Normal+QIKPROP+R5R+SP_ExtensionA+SP_Enhanced"
     else 
@@ -1459,55 +1457,6 @@ cat<<HTVS >> ${Inp_Name}
     SHAPE_RESTRAIN  YES
     SHAPE_REF_LIGAND_FILE   ${Reference_Ligand}
     SHAPE_TYPING    PHASE_QSAR
-[USEROUTS:${task}]
-    USEROUTS   HTVS_OUT,
-    STRUCTOUT   HTVS_OUT
-HTVS
-    Ligand_name="HTVS_OUT"
-    TO_RMSD="${Ligand_name}"
-}
-
-HTVS_local(){
-    # the SCORING_CUTOFF set to 120.0 to tolerate some disadvantageous structures maybe induce receptor conformation.
-    KEEP_NUM=`parse_num_or_percentage ${HTVS_out_num}`
-cat<<HTVS >> ${Inp_Name}
-[STAGE:PRE_DOCK_HTVS]
-    STAGECLASS   gencodes.RecombineStage
-    INPUTS   ${Ligand_name},
-    OUTPUTS   HTVS_RECOMBINE_OUT,
-    NUMOUT   njobs
-    OUTFORMAT   maegz
-    MIN_SUBJOB_STS   4000
-    MAX_SUBJOB_STS   40000
-    GENCODES   YES
-    OUTCOMPOUNDFIELD   s_vsw_compound_code
-    OUTVARIANTFIELD   s_vsw_variant
-    UNIQUEFIELD   NONE
-[STAGE:DOCK_HTVS]
-    STAGECLASS   glide.DockingStage
-    INPUTS   HTVS_RECOMBINE_OUT, GRID
-    OUTPUTS   HTVS_OUT,
-    RECOMBINE   NO
-    PRECISION   HTVS
-    CANONICALIZE NO
-    UNIQUEFIELD   s_vsw_compound_code
-    ${KEEP_NUM}
-    FORCEFIELD  ${corse_ff}
-    DOCKING_METHOD   mininplace
-    POSES_PER_LIG   1
-    BEST_BY_TITLE   NO
-    LIG_VSCALE   ${scalingVdW}
-    LIG_CCUT   0.15
-    MAXATOMS   500
-    MAXROTBONDS   50
-    RINGCONFCUT 5
-    AMIDE_MODE   penal
-    POSE_OUTTYPE   LIB
-    POSTDOCK   YES
-    POSTDOCKSTRAIN   NO
-    COMPRESS_POSES   YES
-    EPIK_PENALTIES   YES
-    FORCEPLANAR   NO
 [USEROUTS:${task}]
     USEROUTS   HTVS_OUT,
     STRUCTOUT   HTVS_OUT
