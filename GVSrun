@@ -2788,9 +2788,6 @@ cat<<IFT >> ${Inp_Name}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
-[USEROUTS:${task}]
-    USEROUTS   ${task}_SP_OUT,
-    STRUCTOUT   ${task}_SP_OUT
 [STAGE:${task}_PULL_IFT]
     STAGECLASS   pull.PullStage
     INPUTS   ${task}_SP_OUT, ${Ligand_name}
@@ -2859,9 +2856,6 @@ cat<<MMGBSA_MIN >> ${Inp_Name}
     NUMBER_OF_PASSES    2
     MINIM_NITER 2
     MINIM_RMSG  0.01
-[USEROUTS:${task}]
-    USEROUTS   MMGBSA_MIN_OUT,
-    STRUCTOUT   MMGBSA_MIN_OUT
 [STAGE:MMGBSA_EN]
     STAGECLASS  prime.MMGBSAStage
     INPUTS  MMGBSA_MIN_OUT,
