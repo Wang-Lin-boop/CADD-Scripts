@@ -50,6 +50,7 @@
     #Docking
     corse_ff="OPLS_2005"
     Force_Field="OPLS4"
+    strain_energy="false"
 
     #Shape Screening
     keep_num=10000
@@ -231,6 +232,7 @@ Control parameters:
   -f    Force Fields for other stage (HTVS/LigPrep...), OPLS_2005, OPLS3e or OPLS4. <OPLS_2005>
   -W    Define a Max/Min Molecular weight for MW module, such as "100:400" <100:400>
   -T    Set a Job Name. Default is "Grid_name-Database_name-Run_Mode".
+  -u    Using strain enegry constraint for docking stage (SP/XP). <false>
   -C    Aattach residue number on receptor, required in Covalent Docking.
             e.g. "cys:A:1425", the A is chain name and 145 is the atom number(Heavy atom). 
             The cys is residue name for A:1425, Supported residues: cys, ser, lys.
@@ -266,7 +268,7 @@ Thank you for your using, If you found any problem, Please contact wanglin3@shan
 HELP
 }
 
-while getopts ":hOi:D:d:m:T:R:a:e:C:b:p:q:c:H:N:P:G:L:A:Q:K:M:S:F:f:W:E:v:" opt
+while getopts ":hOi:D:d:m:T:R:a:e:C:b:p:q:c:H:N:P:G:L:A:Q:K:M:S:F:f:W:E:v:u" opt
 do
   case $opt in
     h)
@@ -313,6 +315,8 @@ do
         Glide=$OPTARG;;
     L)
         LigPrep=$OPTARG;;
+    u)
+        strain_energy=True;;
     A)
         Phase=$OPTARG;;
     Q)
@@ -1548,9 +1552,9 @@ cat<<SP >> ${Inp_Name}
     MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
-    POSE_OUTTYPE   PV
+    POSE_OUTTYPE   LIB
     POSTDOCK   YES
-    POSTDOCKSTRAIN   NO
+    POSTDOCKSTRAIN   ${strain_energy}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
@@ -1598,9 +1602,9 @@ cat<<SP >> ${Inp_Name}
     MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
-    POSE_OUTTYPE   PV
+    POSE_OUTTYPE   LIB
     POSTDOCK   YES
-    POSTDOCKSTRAIN   NO
+    POSTDOCKSTRAIN   ${strain_energy}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
@@ -1650,9 +1654,9 @@ cat<<SP >> ${Inp_Name}
     MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
-    POSE_OUTTYPE   PV
+    POSE_OUTTYPE   LIB
     POSTDOCK   YES
-    POSTDOCKSTRAIN   True
+    POSTDOCKSTRAIN   ${strain_energy}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
@@ -1700,9 +1704,9 @@ cat<<SP >> ${Inp_Name}
     MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
-    POSE_OUTTYPE   PV
+    POSE_OUTTYPE   LIB
     POSTDOCK   YES
-    POSTDOCKSTRAIN   True
+    POSTDOCKSTRAIN   ${strain_energy}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
@@ -1760,7 +1764,7 @@ cat<<SP >> ${Inp_Name}
     MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
-    POSE_OUTTYPE   PV
+    POSE_OUTTYPE   LIB
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
@@ -1769,7 +1773,7 @@ cat<<SP >> ${Inp_Name}
     SHAPE_TYPING    PHASE_QSAR
     POSTDOCK   YES
     POSTDOCK_NPOSE  10
-    POSTDOCKSTRAIN   True
+    POSTDOCKSTRAIN   ${strain_energy}
 [USEROUTS:${task}]
     USEROUTS   ${task}_SP_OUT,
     STRUCTOUT   ${task}_SP_OUT
@@ -1818,9 +1822,9 @@ cat<<SP >> ${Inp_Name}
     MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
-    POSE_OUTTYPE   PV
+    POSE_OUTTYPE   LIB
     POSTDOCK   YES
-    POSTDOCKSTRAIN   NO
+    POSTDOCKSTRAIN   ${strain_energy}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
@@ -1870,10 +1874,10 @@ cat<<SP >> ${Inp_Name}
     MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
-    POSE_OUTTYPE   PV
+    POSE_OUTTYPE   LIB
     POSTDOCK   YES
     POSTDOCK_NPOSE  10
-    POSTDOCKSTRAIN   True
+    POSTDOCKSTRAIN   ${strain_energy}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
@@ -1921,9 +1925,9 @@ cat<<SP >> ${Inp_Name}
     MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
-    POSE_OUTTYPE   PV
+    POSE_OUTTYPE   LIB
     POSTDOCK   YES
-    POSTDOCKSTRAIN   True
+    POSTDOCKSTRAIN   ${strain_energy}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
@@ -1970,9 +1974,9 @@ cat<<XP >> ${Inp_Name}
     MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
-    POSE_OUTTYPE   PV
+    POSE_OUTTYPE   LIB
     POSTDOCK   YES
-    POSTDOCKSTRAIN   NO
+    POSTDOCKSTRAIN   ${strain_energy}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
@@ -2021,10 +2025,10 @@ cat<<XP >> ${Inp_Name}
     MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
-    POSE_OUTTYPE   PV
+    POSE_OUTTYPE   LIB
     POSTDOCK   YES
     POSTDOCK_NPOSE  10
-    POSTDOCKSTRAIN   NO
+    POSTDOCKSTRAIN   ${strain_energy}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
@@ -2075,10 +2079,10 @@ cat<<XP >> ${Inp_Name}
     MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
-    POSE_OUTTYPE   PV
+    POSE_OUTTYPE   LIB
     POSTDOCK   YES
     POSTDOCK_NPOSE  10
-    POSTDOCKSTRAIN   True
+    POSTDOCKSTRAIN   ${strain_energy}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
@@ -2127,9 +2131,9 @@ cat<<XP >> ${Inp_Name}
     MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
-    POSE_OUTTYPE   PV
+    POSE_OUTTYPE   LIB
     POSTDOCK   YES
-    POSTDOCKSTRAIN   True
+    POSTDOCKSTRAIN   ${strain_energy}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
@@ -2187,9 +2191,9 @@ cat<<XP >> ${Inp_Name}
     MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
-    POSE_OUTTYPE   PV
+    POSE_OUTTYPE   LIB
     POSTDOCK   YES
-    POSTDOCKSTRAIN   NO
+    POSTDOCKSTRAIN   ${strain_energy}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
@@ -2238,10 +2242,10 @@ cat<<XP >> ${Inp_Name}
     MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
-    POSE_OUTTYPE   PV
+    POSE_OUTTYPE   LIB
     POSTDOCK   YES
     POSTDOCK_NPOSE  10
-    POSTDOCKSTRAIN   True
+    POSTDOCKSTRAIN   ${strain_energy}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
@@ -2290,9 +2294,9 @@ cat<<XP >> ${Inp_Name}
     MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
-    POSE_OUTTYPE   PV
+    POSE_OUTTYPE   LIB
     POSTDOCK   YES
-    POSTDOCKSTRAIN   True
+    POSTDOCKSTRAIN   ${strain_energy}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
@@ -2784,7 +2788,7 @@ cat<<IFT >> ${Inp_Name}
     AMIDE_MODE   penal
     POSE_OUTTYPE   LIB
     POSTDOCK   YES
-    POSTDOCKSTRAIN   NO
+    POSTDOCKSTRAIN   ${strain_energy}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
@@ -2990,9 +2994,9 @@ cat<<QMMM >> ${Inp_Name}
     MAXATOMS   500
     MAXROTBONDS   50
     AMIDE_MODE   penal
-    POSE_OUTTYPE   PV
+    POSE_OUTTYPE   LIB
     POSTDOCK   YES
-    POSTDOCKSTRAIN   NO
+    POSTDOCKSTRAIN   ${strain_energy}
     COMPRESS_POSES   YES
     EPIK_PENALTIES   YES
     FORCEPLANAR   NO
@@ -3023,70 +3027,6 @@ cat<<CDD >> ${Inp_Name}
 CDD
     Ligand_name="COV_COMPLEX_OUT"
 }
-
-# CD(){
-#     TO_RMSD="${Ligand_name}"
-#     PULL_NUM=`parse_num_or_percentage ${SET_PULL_NUM}`
-#     if [ -z ${covalent_attach_residue} ]; then
-#         echo "Attached Atom must be provided!"
-#         exit
-#     fi
-#     CD_array=(${covalent_attach_residue//:/ })
-#     CD_TYPE=${CD_array[0]}
-#     ChainName=${CD_array[1]}
-#     AtomNum=${CD_array[2]}
-#     ATTACHMENT_ATOM="${ChainName}:${AtomNum}"
-#     if [ $CD_TYPE == "cys" ] || [ $CD_TYPE == "ser" ] || [ $CD_TYPE == "Cys" ] || [ $CD_TYPE == "Ser" ];then
-# cat<<CDD >> ${Inp_Name}
-# [STAGE:GEN_COMPLEX]
-#     STAGECLASS  combine.GenerateCovalentComplexesStage
-#     INPUTS   ${Ligand_name},
-#     OUTPUTS     COV_COMPLEX_OUT,
-#     RECEP_STAYING_ATOM  ${ATTACHMENT_ATOM}
-#     SMARTS  [C,c]=[C,c]-[C,c,S,s]=[O], [C,c]=[O,S], [B]([O])[O], [C;r3][O;r3][C;r3], [S;X2;H1], [C]#[N], [O-0X1]=[C]1[C][C][N]1, NC(=O)C(=O)C(C)N, [C,c]=[C,c]-[C,c]#[N,n], [C-0X2]#[C-0X2][C-0X3]=[O-0X1], [C][S][S][H], [N]=[O,S], [N]=[C]=[S], [C;H1]([Cl])-[C](=[O]), [C]=[C][c][n]
-#     POSITIONS   1, 1, 1, 1, 1, 1, 2, 4, 1, 1, 2, 1, 2, 1, 1
-# [STAGE:INDUCE_FIT]
-#     STAGECLASS  prime.PrimeStage
-#     INPUTS  COV_COMPLEX_OUT
-#     OUTPUTS COV_REFINE_OUT
-#     PRIME_TYPE  COVALENT_DOCKING
-#     OPLS_VERSION    ${Force_Field}
-#     USE_RANDOM_SEED YES
-#     NUMBER_OF_PASSES    3
-#     MINIM_NITER 6
-#     MINIM_RMSG  0.01
-# [USEROUTS:${task}]
-#     USEROUTS   COV_REFINE_OUT,
-#     STRUCTOUT   COV_REFINE_OUT
-# CDD
-#     elif [ $CD_TYPE == "lys" ] || [ $CD_TYPE == "Lys" ];then
-# cat<<CDD >> ${Inp_Name}
-# [STAGE:GEN_COMPLEX]
-#     STAGECLASS  combine.GenerateCovalentComplexesStage
-#     INPUTS   ${Ligand_name},
-#     OUTPUTS     COV_COMPLEX_OUT,
-#     RECEP_STAYING_ATOM  ${ATTACHMENT_ATOM}
-#     SMARTS  [C]=[C]-[S](=O)(=O), [C](=[O])-[C]
-#     POSITIONS   1, 1
-# [STAGE:INDUCE_FIT]
-#     STAGECLASS  prime.PrimeStage
-#     INPUTS  COV_COMPLEX_OUT
-#     OUTPUTS COV_REFINE_OUT
-#     PRIME_TYPE  COVALENT_DOCKING
-#     OPLS_VERSION    ${Force_Field}
-#     USE_RANDOM_SEED YES
-#     NUMBER_OF_PASSES    3
-#     MINIM_NITER 6
-#     MINIM_RMSG  0.01
-# [USEROUTS:${task}]
-#     USEROUTS   COV_REFINE_OUT,
-#     STRUCTOUT   COV_REFINE_OUT
-# CDD
-#     else
-#         echo "Uncongized residue: $CD_TYPE. Supported residues: cys, ser, lys."
-#     fi
-#     Ligand_name="COV_REFINE_OUT"
-# }
 
 RMSD(){
 cat<<RMSD >>${Inp_Name}
