@@ -232,7 +232,7 @@ Control parameters:
   -f    Force Fields for other stage (HTVS/LigPrep...), OPLS_2005, OPLS3e or OPLS4. <OPLS_2005>
   -W    Define a Max/Min Molecular weight for MW module, such as "100:400" <100:400>
   -T    Set a Job Name. Default is "Grid_name-Database_name-Run_Mode".
-  -u    Using strain enegry constraint for docking stage (SP/XP). <false>
+  -u    Using strain enegry correction for docking stage (SP/XP). <false>
   -C    Aattach residue number on receptor, required in Covalent Docking.
             e.g. "cys:A:1425", the A is chain name and 145 is the atom number(Heavy atom). 
             The cys is residue name for A:1425, Supported residues: cys, ser, lys.

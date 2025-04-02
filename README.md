@@ -3,6 +3,10 @@ Scripts to run Schrödinger and Rosetta jobs.
 
 [![DOI](https://zenodo.org/badge/365661221.svg)](https://zenodo.org/badge/latestdoi/365661221)
 
+News
+----
+* 2025/04/02, we add an option `-u` to control the strain energy correction. The default is `false`, this may result in GVSrun's behavior being different from before.
+
 Installation
 ----
 
