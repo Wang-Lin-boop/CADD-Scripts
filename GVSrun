@@ -2828,6 +2828,8 @@ cat<<MMGBSA_EN >> ${Inp_Name}
 [STAGE:MMGBSA_EN]
     STAGECLASS  prime.MMGBSAStage
     INPUTS  ${Ligand_name},
+    LIGAND asl = ligand
+    OPLS_VERSION S-OPLS
     OUTPUTS MMGBSA_EN_OUT
     OUTPUT_LIG_STRAING  True
     USE_MAE_CHARGES True
