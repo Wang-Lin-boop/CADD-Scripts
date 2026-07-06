@@ -595,6 +595,7 @@ if [ $By_Complex == "true" ];then
     else
         echo "COMPLEX       ${Protein_to_DOCK},${ligand_asl}" >>  ${Job_Title}.inp
     fi
+    echo "ALIGN       TRUE" >>  ${Job_Title}.inp
 fi
 
 if [ $By_SiteMap == "true" ];then
